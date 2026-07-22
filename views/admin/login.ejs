@@ -1,0 +1,26 @@
+<% pageTitle = 'Admin login — Wailea Art' %>
+<%- include('../partials/header') %>
+
+<main class="wrap">
+  <div class="login-shell">
+    <div class="login-box">
+      <h3 style="margin-bottom: 18px;">Admin login</h3>
+      <% if (error) { %>
+        <div class="alert alert-error"><%= error %></div>
+      <% } %>
+      <form method="POST" action="/admin/login" class="stack">
+        <div class="field-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required autofocus>
+        </div>
+        <div class="field-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Log in</button>
+      </form>
+    </div>
+  </div>
+</main>
+
+<%- include('../partials/footer') %>

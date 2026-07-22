@@ -1,0 +1,108 @@
+<% pageTitle = 'Admin — Wailea Art' %>
+<%- include('../partials/header') %>
+
+<main class="wrap admin-shell">
+  <div class="admin-header">
+    <h1 style="margin:0;">Admin</h1>
+    <form method="POST" action="/admin/logout">
+      <button class="btn btn-secondary btn-sm" type="submit">Log out</button>
+    </form>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <div class="admin-grid">
+    <div>
+      <div class="admin-card">
+        <h3>Add new art</h3>
+        <form method="POST" action="/admin/artworks" enctype="multipart/form-data" class="stack">
+          <div class="field-group">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" required>
+          </div>
+          <div class="field-group">
+            <label for="description">Description (optional)</label>
+            <textarea id="description" name="description" rows="3"></textarea>
+          </div>
+          <div class="field-group">
+            <label for="image">Image (JPG, PNG, or WEBP)</label>
+            <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp" required>
+          </div>
+
+          <div class="field-group">
+            <label>Pricing (defaults are prefilled — change only if this piece differs)</label>
+            <div class="price-inputs">
+              <div>
+                <label for="price_retail" style="margin-bottom:4px;">Retail</label>
+                <input type="number" step="0.01" id="price_retail" name="price_retail" value="45.00">
+              </div>
+              <div>
+                <label for="price_bulk_packaging" style="margin-bottom:4px;">Bulk, packaged</label>
+                <input type="number" step="0.01" id="price_bulk_packaging" name="price_bulk_packaging" value="30.00">
+              </div>
+              <div>
+                <label for="price_bulk_no_packaging" style="margin-bottom:4px;">Bulk, no packaging</label>
+                <input type="number" step="0.01" id="price_bulk_no_packaging" name="price_bulk_no_packaging" value="25.00">
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-block" type="submit">Add to gallery</button>
+        </form>
+      </div>
+
+      <div class="admin-card">
+        <h3>Messages</h3>
+        <% if (messages.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No messages yet.</p>
+        <% } else { %>
+          <% messages.forEach(function(m) { %>
+            <div class="msg-item">
+              <div class="msg-meta"><%= m.name %> &middot; <%= m.email %> &middot; <%= m.created_at %></div>
+              <div class="msg-body"><%= m.message %></div>
+            </div>
+          <% }); %>
+        <% } %>
+      </div>
+    </div>
+
+    <div>
+      <div class="admin-card">
+        <h3>Gallery order</h3>
+        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">Drag pieces to reorder. Top of the list shows first on the homepage.</p>
+
+        <% if (artworks.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No art yet — add your first piece.</p>
+        <% } else { %>
+          <ul class="sortable-list" id="sortableList">
+            <% artworks.forEach(function(art) { %>
+              <li class="sortable-item" draggable="true" data-id="<%= art.id %>">
+                <span class="drag-handle">&#8942;&#8942;</span>
+                <img src="<%= art.image_path %>" alt="<%= art.title %>">
+                <span class="item-title"><%= art.title %></span>
+                <div class="item-actions">
+                  <form method="POST" action="/admin/artworks/<%= art.id %>/move">
+                    <input type="hidden" name="direction" value="top">
+                    <button class="btn btn-secondary btn-sm" type="submit">To top</button>
+                  </form>
+                  <form method="POST" action="/admin/artworks/<%= art.id %>/move">
+                    <input type="hidden" name="direction" value="bottom">
+                    <button class="btn btn-secondary btn-sm" type="submit">To bottom</button>
+                  </form>
+                  <form method="POST" action="/admin/artworks/<%= art.id %>/delete" onsubmit="return confirm('Delete this piece? This cannot be undone.');">
+                    <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                  </form>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</main>
+
+<%- include('../partials/footer') %>
+<script src="/js/admin.js"></script>

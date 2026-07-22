@@ -1,0 +1,17 @@
+<% pageTitle = (success ? 'Order confirmed' : 'Order canceled') + ' — Wailea Art' %>
+<%- include('partials/header') %>
+
+<main class="wrap">
+  <div class="page-content">
+    <% if (success) { %>
+      <h1>Thank you — your order is confirmed.</h1>
+      <p>A receipt has been sent to your email from Stripe. Your print will ship soon.</p>
+    <% } else { %>
+      <h1>Your order was canceled.</h1>
+      <p>No payment was made. Feel free to head back to the gallery whenever you're ready.</p>
+    <% } %>
+    <a class="btn btn-primary" href="/" style="margin-top: 10px;">Back to gallery</a>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

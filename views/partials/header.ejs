@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof pageTitle !== 'undefined' ? pageTitle : 'Wailea Art' %></title>
+  <meta name="description" content="Original art prints by Wailea Art, 8.5 x 11 inches, available individually or in bulk.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a href="/" class="brand">Wailea <span>Art</span></a>
+      <nav class="main-nav">
+        <a href="/" class="<%= page === 'home' ? 'active' : '' %>">Gallery</a>
+        <a href="/about" class="<%= page === 'about' ? 'active' : '' %>">About</a>
+        <a href="/contact" class="<%= page === 'contact' ? 'active' : '' %>">Contact</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wave-rule">
+    <svg viewBox="0 0 1200 14" preserveAspectRatio="none">
+      <path d="M0,7 C100,0 200,14 300,7 C400,0 500,14 600,7 C700,0 800,14 900,7 C1000,0 1100,14 1200,7" />
+    </svg>
+  </div>

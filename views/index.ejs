@@ -1,0 +1,88 @@
+<% pageTitle = 'Wailea Art — Original Prints' %>
+<%- include('partials/header') %>
+
+<main class="wrap">
+  <div class="intro">
+    <h1>Original prints, made to live on your wall.</h1>
+    <p>Every piece is 8.5&Prime; &times; 11&Prime;, printed and shipped from Wailea. Order a single print, or ask about bulk pricing for ten or more of the same piece.</p>
+  </div>
+
+  <% if (artworks.length === 0) { %>
+    <div class="empty-state">
+      <p>New work is on its way — check back soon.</p>
+    </div>
+  <% } else { %>
+    <div class="gallery">
+      <% artworks.forEach(function(art) { %>
+        <div class="card">
+          <div class="card-img">
+            <img src="<%= art.image_path %>" alt="<%= art.title %>" loading="lazy">
+          </div>
+          <div class="card-body">
+            <h3 class="card-title"><%= art.title %></h3>
+            <% if (art.description) { %>
+              <p class="card-desc"><%= art.description %></p>
+            <% } %>
+            <div class="card-price">
+              <span class="from">From</span>$<%= art.price_bulk_no_packaging.toFixed(2) %>
+            </div>
+            <button
+              class="btn btn-primary btn-block js-open-buy"
+              data-id="<%= art.id %>"
+              data-title="<%= art.title %>"
+              data-image="<%= art.image_path %>"
+              data-retail="<%= art.price_retail %>"
+              data-bulk-pkg="<%= art.price_bulk_packaging %>"
+              data-bulk-nopkg="<%= art.price_bulk_no_packaging %>"
+            >Buy this print</button>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+</main>
+
+<!-- Buy modal -->
+<div class="modal-overlay" id="buyModal">
+  <div class="modal">
+    <button class="modal-close" id="closeModal" aria-label="Close">&times;</button>
+    <h3 id="modalTitle">Print title</h3>
+
+    <div class="field-group">
+      <label>Order type</label>
+      <div class="toggle-row" id="modeToggle">
+        <button type="button" data-mode="retail" class="active">Retail</button>
+        <button type="button" data-mode="bulk">Bulk (10+)</button>
+      </div>
+    </div>
+
+    <div class="field-group hidden" id="packagingGroup">
+      <label>Packaging</label>
+      <div class="toggle-row" id="packagingToggle">
+        <button type="button" data-packaging="1" class="active">With packaging</button>
+        <button type="button" data-packaging="0">No packaging</button>
+      </div>
+      <p class="packaging-note">Packaging includes a protective plastic sleeve, support backing, and a white card envelope. Choosing "no packaging" reduces the price but ships the print unprotected.</p>
+    </div>
+
+    <div class="field-group">
+      <label for="qtyInput">Quantity</label>
+      <input type="number" id="qtyInput" min="1" value="1" step="1">
+      <p class="packaging-note" id="qtyHint"></p>
+    </div>
+
+    <div class="order-total">
+      <span>Total</span>
+      <span class="amt" id="orderTotal">$45.00</span>
+    </div>
+
+    <p class="modal-error hidden" id="modalError"></p>
+
+    <button class="btn btn-primary btn-block" id="checkoutBtn" style="margin-top:14px;">
+      Checkout with Stripe
+    </button>
+  </div>
+</div>
+
+<%- include('partials/footer') %>
+<script src="/js/gallery.js"></script>

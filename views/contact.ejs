@@ -1,0 +1,34 @@
+<% pageTitle = 'Contact — Wailea Art' %>
+<%- include('partials/header') %>
+
+<main class="wrap">
+  <div class="page-content">
+    <h1>Contact</h1>
+    <p class="lede">Questions about a piece, custom sizing, or a bulk order? Send a note below.</p>
+
+    <% if (typeof sent !== 'undefined' && sent) { %>
+      <div class="alert alert-success">Thanks — your message has been sent. We'll get back to you soon.</div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <form class="stack" method="POST" action="/contact">
+      <div class="field-group">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required>
+      </div>
+      <div class="field-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required>
+      </div>
+      <div class="field-group">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="5" required></textarea>
+      </div>
+      <button class="btn btn-primary" type="submit">Send message</button>
+    </form>
+  </div>
+</main>
+
+<%- include('partials/footer') %>
