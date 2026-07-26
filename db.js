@@ -14,11 +14,26 @@ db.exec(`
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     image_path TEXT NOT NULL,
+    dimensions TEXT NOT NULL DEFAULT '8.5" x 11"',
     price_retail REAL NOT NULL DEFAULT 45.00,
     price_bulk_packaging REAL NOT NULL DEFAULT 30.00,
     price_bulk_no_packaging REAL NOT NULL DEFAULT 25.00,
     position REAL NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    slug TEXT NOT NULL UNIQUE,
+    position REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS artwork_categories (
+    artwork_id INTEGER NOT NULL REFERENCES artworks(id) ON DELETE CASCADE,
+    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    PRIMARY KEY (artwork_id, category_id)
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -29,5 +44,11 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `);
+
+// Migration: add 'dimensions' column for databases created before this feature existed
+const artworkCols = db.prepare("PRAGMA table_info(artworks)").all().map(c => c.name);
+if (!artworkCols.includes('dimensions')) {
+  db.exec(`ALTER TABLE artworks ADD COLUMN dimensions TEXT NOT NULL DEFAULT '8.5" x 11"'`);
+}
 
 module.exports = db;

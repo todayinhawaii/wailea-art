@@ -4,8 +4,23 @@ const db = require('../db');
 const { BULK_MIN_QTY } = require('../lib/pricing');
 
 router.get('/', (req, res) => {
-  const artworks = db.prepare('SELECT * FROM artworks ORDER BY position ASC').all();
-  res.render('index', { artworks, bulkMinQty: BULK_MIN_QTY, page: 'home' });
+  const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
+  const activeSlug = req.query.category || null;
+
+  let artworks;
+  if (activeSlug) {
+    artworks = db.prepare(`
+      SELECT DISTINCT a.* FROM artworks a
+      JOIN artwork_categories ac ON ac.artwork_id = a.id
+      JOIN categories c ON c.id = ac.category_id
+      WHERE c.slug = ?
+      ORDER BY a.position ASC
+    `).all(activeSlug);
+  } else {
+    artworks = db.prepare('SELECT * FROM artworks ORDER BY position ASC').all();
+  }
+
+  res.render('index', { artworks, categories, activeSlug, bulkMinQty: BULK_MIN_QTY, page: 'home' });
 });
 
 router.get('/about', (req, res) => {

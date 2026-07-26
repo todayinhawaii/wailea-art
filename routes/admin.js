@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 const db = require('../db');
 const upload = require('../lib/upload');
 const requireAdmin = require('../lib/requireAdmin');
+const slugify = require('../lib/slugify');
 
 // ---------- Login ----------
 
@@ -32,42 +35,170 @@ router.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/admin/login'));
 });
 
+// ---------- Helpers ----------
+
+function getArtworksWithCategories() {
+  const artworks = db.prepare('SELECT * FROM artworks ORDER BY position ASC').all();
+  const catStmt = db.prepare(`
+    SELECT c.id, c.name FROM categories c
+    JOIN artwork_categories ac ON ac.category_id = c.id
+    WHERE ac.artwork_id = ?
+    ORDER BY c.name ASC
+  `);
+  return artworks.map(a => ({ ...a, categories: catStmt.all(a.id) }));
+}
+
+function dashboardData() {
+  return {
+    artworks: getArtworksWithCategories(),
+    categories: db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all(),
+    messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all()
+  };
+}
+
+function setArtworkCategories(artworkId, categoryIds) {
+  db.prepare('DELETE FROM artwork_categories WHERE artwork_id = ?').run(artworkId);
+  const insert = db.prepare('INSERT OR IGNORE INTO artwork_categories (artwork_id, category_id) VALUES (?, ?)');
+  const tx = db.transaction((ids) => {
+    ids.forEach(cid => insert.run(artworkId, cid));
+  });
+  tx(categoryIds);
+}
+
+function normalizeCategoryIds(raw) {
+  if (!raw) return [];
+  const arr = Array.isArray(raw) ? raw : [raw];
+  return arr.map(v => parseInt(v, 10)).filter(v => Number.isInteger(v));
+}
+
 // ---------- Dashboard ----------
 
 router.get('/', requireAdmin, (req, res) => {
-  const artworks = db.prepare('SELECT * FROM artworks ORDER BY position ASC').all();
-  const messages = db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all();
-  res.render('admin/dashboard', { artworks, messages, error: null, page: 'admin' });
+  res.render('admin/dashboard', { ...dashboardData(), error: null, page: 'admin' });
+});
+
+// ---------- Categories ----------
+
+router.post('/categories', requireAdmin, (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.render('admin/dashboard', { ...dashboardData(), error: 'Category name is required.', page: 'admin' });
+  }
+
+  let slug = slugify(name);
+  if (!slug) {
+    return res.render('admin/dashboard', { ...dashboardData(), error: 'Please use a category name with letters or numbers.', page: 'admin' });
+  }
+
+  // ensure slug uniqueness
+  let finalSlug = slug;
+  let n = 2;
+  while (db.prepare('SELECT id FROM categories WHERE slug = ?').get(finalSlug)) {
+    finalSlug = `${slug}-${n}`;
+    n++;
+  }
+
+  const maxPos = db.prepare('SELECT MAX(position) AS m FROM categories').get().m;
+  const position = (maxPos === null ? 0 : maxPos + 1);
+
+  try {
+    db.prepare('INSERT INTO categories (name, slug, position) VALUES (?, ?, ?)').run(name.trim(), finalSlug, position);
+  } catch (err) {
+    return res.render('admin/dashboard', { ...dashboardData(), error: 'That category already exists.', page: 'admin' });
+  }
+
+  res.redirect('/admin');
+});
+
+router.post('/categories/:id/delete', requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
+  res.redirect('/admin');
 });
 
 // ---------- Artworks ----------
 
 router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
-  const { title, description, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
+  const { title, description, dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
+  const categoryIds = normalizeCategoryIds(req.body.category_ids);
 
   if (!title || !req.file) {
-    const artworks = db.prepare('SELECT * FROM artworks ORDER BY position ASC').all();
-    const messages = db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all();
     return res.render('admin/dashboard', {
-      artworks, messages, error: 'Title and image are required.', page: 'admin'
+      ...dashboardData(), error: 'Title and image are required.', page: 'admin'
     });
   }
 
   const maxPos = db.prepare('SELECT MAX(position) AS m FROM artworks').get().m;
   const position = (maxPos === null ? 0 : maxPos + 1);
 
-  db.prepare(`
-    INSERT INTO artworks (title, description, image_path, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+  const result = db.prepare(`
+    INSERT INTO artworks (title, description, image_path, dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     title.trim(),
     (description || '').trim(),
     `/uploads/${req.file.filename}`,
+    (dimensions || '').trim() || '8.5" x 11"',
     parseFloat(price_retail) || 45.00,
     parseFloat(price_bulk_packaging) || 30.00,
     parseFloat(price_bulk_no_packaging) || 25.00,
     position
   );
+
+  if (categoryIds.length) setArtworkCategories(result.lastInsertRowid, categoryIds);
+
+  res.redirect('/admin');
+});
+
+router.get('/artworks/:id/edit', requireAdmin, (req, res) => {
+  const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
+  if (!artwork) return res.redirect('/admin');
+
+  const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
+  const selectedIds = db.prepare('SELECT category_id FROM artwork_categories WHERE artwork_id = ?')
+    .all(artwork.id).map(r => r.category_id);
+
+  res.render('admin/edit-artwork', { artwork, categories, selectedIds, error: null, page: 'admin' });
+});
+
+router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) => {
+  const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
+  if (!artwork) return res.redirect('/admin');
+
+  const { title, description, dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
+  const categoryIds = normalizeCategoryIds(req.body.category_ids);
+
+  if (!title || !title.trim()) {
+    const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
+    return res.render('admin/edit-artwork', {
+      artwork, categories, selectedIds: categoryIds, error: 'Title is required.', page: 'admin'
+    });
+  }
+
+  let imagePath = artwork.image_path;
+  if (req.file) {
+    imagePath = `/uploads/${req.file.filename}`;
+    // remove old image file if it lived in our uploads folder
+    const oldFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
+    fs.unlink(oldFile, () => {});
+  }
+
+  db.prepare(`
+    UPDATE artworks
+    SET title = ?, description = ?, image_path = ?, dimensions = ?,
+        price_retail = ?, price_bulk_packaging = ?, price_bulk_no_packaging = ?
+    WHERE id = ?
+  `).run(
+    title.trim(),
+    (description || '').trim(),
+    imagePath,
+    (dimensions || '').trim() || '8.5" x 11"',
+    parseFloat(price_retail) || 45.00,
+    parseFloat(price_bulk_packaging) || 30.00,
+    parseFloat(price_bulk_no_packaging) || 25.00,
+    artwork.id
+  );
+
+  setArtworkCategories(artwork.id, categoryIds);
 
   res.redirect('/admin');
 });

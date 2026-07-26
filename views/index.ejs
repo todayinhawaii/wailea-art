@@ -4,12 +4,21 @@
 <main class="wrap">
   <div class="intro">
     <h1>Original prints, made to live on your wall.</h1>
-    <p>Every piece is 8.5&Prime; &times; 11&Prime;, printed and shipped from Wailea. Order a single print, or ask about bulk pricing for ten or more of the same piece.</p>
+    <p>Every piece is printed and shipped from Wailea. Order a single print, or ask about bulk pricing for ten or more of the same piece.</p>
   </div>
+
+  <% if (categories.length > 0) { %>
+    <div class="category-pills">
+      <a href="/" class="pill <%= !activeSlug ? 'active' : '' %>">All</a>
+      <% categories.forEach(function(cat) { %>
+        <a href="/?category=<%= cat.slug %>" class="pill <%= activeSlug === cat.slug ? 'active' : '' %>"><%= cat.name %></a>
+      <% }); %>
+    </div>
+  <% } %>
 
   <% if (artworks.length === 0) { %>
     <div class="empty-state">
-      <p>New work is on its way — check back soon.</p>
+      <p><% if (activeSlug) { %>No pieces in this category yet.<% } else { %>New work is on its way — check back soon.<% } %></p>
     </div>
   <% } else { %>
     <div class="gallery">
@@ -20,6 +29,7 @@
           </div>
           <div class="card-body">
             <h3 class="card-title"><%= art.title %></h3>
+            <p class="card-dimensions"><%= art.dimensions %></p>
             <% if (art.description) { %>
               <p class="card-desc"><%= art.description %></p>
             <% } %>
@@ -30,6 +40,7 @@
               class="btn btn-primary btn-block js-open-buy"
               data-id="<%= art.id %>"
               data-title="<%= art.title %>"
+              data-dimensions="<%= art.dimensions %>"
               data-image="<%= art.image_path %>"
               data-retail="<%= art.price_retail %>"
               data-bulk-pkg="<%= art.price_bulk_packaging %>"
@@ -47,6 +58,7 @@
   <div class="modal">
     <button class="modal-close" id="closeModal" aria-label="Close">&times;</button>
     <h3 id="modalTitle">Print title</h3>
+    <p id="modalDimensions" style="color: var(--ink-soft); font-size: 0.85rem; margin-top: -10px; margin-bottom: 16px;"></p>
 
     <div class="field-group">
       <label>Order type</label>

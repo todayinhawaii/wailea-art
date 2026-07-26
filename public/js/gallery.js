@@ -4,6 +4,7 @@
   const modal = document.getElementById('buyModal');
   const closeBtn = document.getElementById('closeModal');
   const modalTitle = document.getElementById('modalTitle');
+  const modalDimensions = document.getElementById('modalDimensions');
   const modeToggle = document.getElementById('modeToggle');
   const packagingGroup = document.getElementById('packagingGroup');
   const packagingToggle = document.getElementById('packagingToggle');
@@ -44,6 +45,7 @@
     modalError.classList.add('hidden');
 
     modalTitle.textContent = data.title;
+    modalDimensions.textContent = data.dimensions || '';
     [...modeToggle.children].forEach(b => b.classList.toggle('active', b.dataset.mode === 'retail'));
     [...packagingToggle.children].forEach(b => b.classList.toggle('active', b.dataset.packaging === '1'));
     packagingGroup.classList.add('hidden');
@@ -62,6 +64,7 @@
       openModal({
         id: btn.dataset.id,
         title: btn.dataset.title,
+        dimensions: btn.dataset.dimensions,
         retail: parseFloat(btn.dataset.retail),
         bulkPkg: parseFloat(btn.dataset.bulkPkg),
         bulkNoPkg: parseFloat(btn.dataset.bulkNopkg)

@@ -111,6 +111,32 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 }
 .intro h1 { font-size: 2.1rem; margin-bottom: 0.3em; }
 
+/* ---------- category pills ---------- */
+.category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 0 8px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--sand-line);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.pill:hover { border-color: var(--ocean); color: var(--ink); }
+.pill.active {
+  background: var(--ocean);
+  border-color: var(--ocean);
+  color: #fff;
+}
+
 /* ---------- gallery grid ---------- */
 .gallery {
   display: grid;
@@ -157,6 +183,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   flex: 1;
 }
 .card-title { font-size: 1.08rem; margin: 0; }
+.card-dimensions { color: var(--ink-soft); font-size: 0.8rem; margin: -4px 0 0; text-transform: uppercase; letter-spacing: 0.03em; }
 .card-desc { color: var(--ink-soft); font-size: 0.9rem; margin: 0; flex: 1; }
 .card-price {
   font-family: 'Fraunces', Georgia, serif;
@@ -394,3 +421,33 @@ form.stack .field-group { margin: 0 0 16px; }
 
 .price-inputs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 @media (max-width: 520px) { .price-inputs { grid-template-columns: 1fr; } }
+
+.checkbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.checkbox-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sand-line);
+  background: var(--sand);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.checkbox-pill input { margin: 0; }
+
+.category-manage-list { display: flex; flex-direction: column; gap: 8px; }
+.category-manage-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border: 1px solid var(--sand-line);
+  border-radius: var(--radius);
+  background: var(--sand);
+  font-size: 0.9rem;
+}

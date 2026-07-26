@@ -1,0 +1,74 @@
+<% pageTitle = 'Edit art — Wailea Art' %>
+<%- include('../partials/header') %>
+
+<main class="wrap admin-shell">
+  <div class="admin-header">
+    <h1 style="margin:0;">Edit art</h1>
+    <a class="btn btn-secondary btn-sm" href="/admin">Back to admin</a>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <div class="admin-card" style="max-width: 560px;">
+    <div style="margin-bottom: 18px;">
+      <img src="<%= artwork.image_path %>" alt="<%= artwork.title %>" style="max-width: 160px; border-radius: 3px; border: 1px solid var(--sand-line);">
+    </div>
+
+    <form method="POST" action="/admin/artworks/<%= artwork.id %>" enctype="multipart/form-data" class="stack">
+      <div class="field-group">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" value="<%= artwork.title %>" required>
+      </div>
+      <div class="field-group">
+        <label for="description">Description (optional)</label>
+        <textarea id="description" name="description" rows="3"><%= artwork.description %></textarea>
+      </div>
+      <div class="field-group">
+        <label for="dimensions">Dimensions</label>
+        <input type="text" id="dimensions" name="dimensions" value="<%= artwork.dimensions %>">
+      </div>
+      <div class="field-group">
+        <label for="image">Replace image (optional — leave blank to keep current image)</label>
+        <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp">
+      </div>
+
+      <% if (categories.length > 0) { %>
+        <div class="field-group">
+          <label>Categories</label>
+          <div class="checkbox-grid">
+            <% categories.forEach(function(cat) { %>
+              <label class="checkbox-pill">
+                <input type="checkbox" name="category_ids" value="<%= cat.id %>" <%= selectedIds.includes(cat.id) ? 'checked' : '' %>>
+                <span><%= cat.name %></span>
+              </label>
+            <% }); %>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="field-group">
+        <label>Pricing</label>
+        <div class="price-inputs">
+          <div>
+            <label for="price_retail" style="margin-bottom:4px;">Retail</label>
+            <input type="number" step="0.01" id="price_retail" name="price_retail" value="<%= artwork.price_retail %>">
+          </div>
+          <div>
+            <label for="price_bulk_packaging" style="margin-bottom:4px;">Bulk, packaged</label>
+            <input type="number" step="0.01" id="price_bulk_packaging" name="price_bulk_packaging" value="<%= artwork.price_bulk_packaging %>">
+          </div>
+          <div>
+            <label for="price_bulk_no_packaging" style="margin-bottom:4px;">Bulk, no packaging</label>
+            <input type="number" step="0.01" id="price_bulk_no_packaging" name="price_bulk_no_packaging" value="<%= artwork.price_bulk_no_packaging %>">
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-block" type="submit">Save changes</button>
+    </form>
+  </div>
+</main>
+
+<%- include('../partials/footer') %>

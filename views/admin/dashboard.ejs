@@ -27,9 +27,27 @@
             <textarea id="description" name="description" rows="3"></textarea>
           </div>
           <div class="field-group">
+            <label for="dimensions">Dimensions</label>
+            <input type="text" id="dimensions" name="dimensions" placeholder='8.5" x 11"' value='8.5" x 11"'>
+          </div>
+          <div class="field-group">
             <label for="image">Image (JPG, PNG, or WEBP)</label>
             <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp" required>
           </div>
+
+          <% if (categories.length > 0) { %>
+            <div class="field-group">
+              <label>Categories (optional, choose any that apply)</label>
+              <div class="checkbox-grid">
+                <% categories.forEach(function(cat) { %>
+                  <label class="checkbox-pill">
+                    <input type="checkbox" name="category_ids" value="<%= cat.id %>">
+                    <span><%= cat.name %></span>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          <% } %>
 
           <div class="field-group">
             <label>Pricing (defaults are prefilled — change only if this piece differs)</label>
@@ -50,6 +68,36 @@
           </div>
 
           <button class="btn btn-primary btn-block" type="submit">Add to gallery</button>
+        </form>
+      </div>
+
+      <div class="admin-card">
+        <h3>Categories</h3>
+        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">These show as pills at the top of your homepage.</p>
+
+        <% if (categories.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No categories yet — add your first one below.</p>
+        <% } else { %>
+          <div class="category-manage-list">
+            <% categories.forEach(function(cat) { %>
+              <div class="category-manage-item">
+                <span><%= cat.name %></span>
+                <form method="POST" action="/admin/categories/<%= cat.id %>/delete" onsubmit="return confirm('Delete this category? It will be removed from any art using it.');">
+                  <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                </form>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <form method="POST" action="/admin/categories" class="stack" style="margin-top:16px;">
+          <div class="field-group" style="display:flex; gap:10px; margin:0; align-items:flex-end;">
+            <div style="flex:1;">
+              <label for="cat_name">New category name</label>
+              <input type="text" id="cat_name" name="name" placeholder="e.g. Ocean" required>
+            </div>
+            <button class="btn btn-secondary" type="submit">Add</button>
+          </div>
         </form>
       </div>
 
@@ -81,8 +129,17 @@
               <li class="sortable-item" draggable="true" data-id="<%= art.id %>">
                 <span class="drag-handle">&#8942;&#8942;</span>
                 <img src="<%= art.image_path %>" alt="<%= art.title %>">
-                <span class="item-title"><%= art.title %></span>
+                <div class="item-title">
+                  <div><%= art.title %></div>
+                  <div style="font-size:0.76rem; color:var(--ink-soft);">
+                    <%= art.dimensions %>
+                    <% if (art.categories && art.categories.length) { %>
+                      &middot; <%= art.categories.map(c => c.name).join(', ') %>
+                    <% } %>
+                  </div>
+                </div>
                 <div class="item-actions">
+                  <a class="btn btn-secondary btn-sm" href="/admin/artworks/<%= art.id %>/edit">Edit</a>
                   <form method="POST" action="/admin/artworks/<%= art.id %>/move">
                     <input type="hidden" name="direction" value="top">
                     <button class="btn btn-secondary btn-sm" type="submit">To top</button>
