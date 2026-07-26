@@ -219,6 +219,22 @@ router.get('/artworks/:id/edit', requireAdmin, (req, res) => {
   res.render('admin/edit-artwork', { artwork, categories, selectedIds, error: null, page: 'admin' });
 });
 
+// Reorder: expects { orderedIds: [3, 1, 2, ...] } lowest index = top of gallery
+// IMPORTANT: this must be registered BEFORE the generic '/artworks/:id' route below,
+// otherwise Express matches "reorder" as if it were an :id and this handler never runs.
+router.post('/artworks/reorder', requireAdmin, (req, res) => {
+  const { orderedIds } = req.body;
+  if (!Array.isArray(orderedIds)) return res.status(400).json({ error: 'Invalid payload.' });
+
+  const update = db.prepare('UPDATE artworks SET position = ? WHERE id = ?');
+  const tx = db.transaction((ids) => {
+    ids.forEach((id, index) => update.run(index, id));
+  });
+  tx(orderedIds);
+
+  res.json({ ok: true });
+});
+
 router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) => {
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   if (!artwork) return res.redirect('/admin');
@@ -268,20 +284,6 @@ router.post('/artworks/:id/delete', requireAdmin, (req, res) => {
   res.redirect('/admin');
 });
 
-// Reorder: expects { orderedIds: [3, 1, 2, ...] } lowest index = top of gallery
-router.post('/artworks/reorder', requireAdmin, (req, res) => {
-  const { orderedIds } = req.body;
-  if (!Array.isArray(orderedIds)) return res.status(400).json({ error: 'Invalid payload.' });
-
-  const update = db.prepare('UPDATE artworks SET position = ? WHERE id = ?');
-  const tx = db.transaction((ids) => {
-    ids.forEach((id, index) => update.run(index, id));
-  });
-  tx(orderedIds);
-
-  res.json({ ok: true });
-});
-
 // Move single item to very top or very bottom (used by "send to top/bottom" buttons)
 router.post('/artworks/:id/move', requireAdmin, (req, res) => {
   const { direction } = req.body; // 'top' | 'bottom'
@@ -299,6 +301,8 @@ router.post('/artworks/:id/move', requireAdmin, (req, res) => {
 
   res.redirect('/admin');
 });
+
+
 
 // ---------- Blog posts ----------
 
