@@ -3,6 +3,27 @@ const router = express.Router();
 const db = require('../db');
 const { BULK_MIN_QTY } = require('../lib/pricing');
 
+router.get('/sitemap.xml', (req, res) => {
+  const siteUrl = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
+  const categories = db.prepare('SELECT slug FROM categories').all();
+
+  const urls = [
+    { loc: `${siteUrl}/`, priority: '1.0', changefreq: 'weekly' },
+    { loc: `${siteUrl}/about`, priority: '0.7', changefreq: 'monthly' },
+    { loc: `${siteUrl}/contact`, priority: '0.6', changefreq: 'monthly' }
+  ];
+  categories.forEach(c => {
+    urls.push({ loc: `${siteUrl}/?category=${c.slug}`, priority: '0.5', changefreq: 'weekly' });
+  });
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map(u => `  <url>\n    <loc>${u.loc}</loc>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`).join('\n')}
+</urlset>`;
+
+  res.type('application/xml').send(xml);
+});
+
 router.get('/', (req, res) => {
   const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
   const activeSlug = req.query.category || null;

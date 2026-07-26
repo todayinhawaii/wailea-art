@@ -1,10 +1,13 @@
-<% pageTitle = 'Wailea Art — Original Prints' %>
+<% pageTitle = 'Wailea Art | Original Hawaii & Maui Art Prints for Sale' %>
+<% metaDescription = 'Shop original Hawaii and Maui art prints from Wailea Art. Wall art inspired by Wailea, Kapalua, Lahaina, Oahu, Honolulu, Kauai and the Hawaiian islands. Retail and bulk pricing available.' %>
+<% canonicalPath = activeSlug ? ('/?category=' + activeSlug) : '/' %>
+<% if (artworks.length > 0) { ogImage = artworks[0].image_path } %>
 <%- include('partials/header') %>
 
 <main class="wrap">
   <div class="intro">
-    <h1>Original prints, made to live on your wall.</h1>
-    <p>Every piece is printed and shipped from Wailea. Order a single print, or ask about bulk pricing for ten or more of the same piece.</p>
+    <h1>Original Hawaii & Maui art prints, made to live on your wall.</h1>
+    <p>Every piece is printed and shipped from Wailea, Maui — art inspired by the islands of Hawaii, from Kapalua and Lahaina to Oahu, Honolulu, and beyond. Order a single print, or ask about bulk pricing for ten or more of the same piece.</p>
   </div>
 
   <% if (categories.length > 0) { %>
@@ -25,7 +28,7 @@
       <% artworks.forEach(function(art) { %>
         <div class="card">
           <div class="card-img">
-            <img src="<%= art.image_path %>" alt="<%= art.title %>" loading="lazy">
+            <img src="<%= art.image_path %>" alt="<%= art.title %> - Original Hawaii Art Print by Wailea Art" loading="lazy">
           </div>
           <div class="card-body">
             <h3 class="card-title"><%= art.title %></h3>
@@ -51,6 +54,35 @@
         </div>
       <% }); %>
     </div>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "itemListElement": [
+        <% artworks.forEach(function(art, i) { %>
+        {
+          "@type": "ListItem",
+          "position": <%= i + 1 %>,
+          "item": {
+            "@type": "Product",
+            "name": <%- JSON.stringify(art.title) %>,
+            "image": "<%= siteUrl %><%= art.image_path %>",
+            "description": <%- JSON.stringify((art.description || 'Original Hawaii art print by Wailea Art.') + (art.material ? ' Material: ' + art.material : '') + (art.dimensions ? ' Size: ' + art.dimensions : '')) %>,
+            "brand": { "@type": "Brand", "name": "Wailea Art" },
+            "offers": {
+              "@type": "Offer",
+              "priceCurrency": "USD",
+              "price": "<%= art.price_retail.toFixed(2) %>",
+              "availability": "https://schema.org/InStock",
+              "url": "<%= siteUrl %>/"
+            }
+          }
+        }<%= i < artworks.length - 1 ? ',' : '' %>
+        <% }); %>
+      ]
+    }
+    </script>
   <% } %>
 </main>
 

@@ -3,12 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= typeof pageTitle !== 'undefined' ? pageTitle : 'Wailea Art' %></title>
-  <meta name="description" content="Original art prints by Wailea Art, 8.5 x 11 inches, available individually or in bulk.">
+  <title><%= typeof pageTitle !== 'undefined' ? pageTitle : 'Wailea Art | Original Hawaii & Maui Art Prints' %></title>
+
+  <meta name="description" content="<%= typeof metaDescription !== 'undefined' ? metaDescription : 'Original Hawaii and Maui art prints from Wailea Art. Shop wall art inspired by Wailea, Kapalua, Lahaina, Oahu, Honolulu and the Hawaiian islands. Retail and bulk pricing available.' %>">
+  <meta name="keywords" content="Hawaii art, Hawaiian art, Hawaii artists, Maui art, Wailea art, Wailea Maui art, Kapalua art, Lahaina art, Oahu art, Honolulu art, Kauai art, Big Island art, Hawaii wall art, Hawaii art prints, Hawaii art prints for sale, Maui wall art, Hawaiian art prints, Hawaiian home decor, Hawaii gift shop art, Maui gift art, tropical wall art, island art prints, original Hawaii paintings, Hawaii art gallery, buy Hawaii art online, bulk Hawaii art prints, wholesale Hawaii art, Hawaii art for retailers">
+  <meta name="robots" content="<%= typeof noIndex !== 'undefined' && noIndex ? 'noindex, nofollow' : 'index, follow' %>">
+  <link rel="canonical" href="<%= siteUrl %><%= typeof canonicalPath !== 'undefined' ? canonicalPath : '' %>">
+
+  <!-- Open Graph / social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Wailea Art">
+  <meta property="og:title" content="<%= typeof pageTitle !== 'undefined' ? pageTitle : 'Wailea Art | Original Hawaii & Maui Art Prints' %>">
+  <meta property="og:description" content="<%= typeof metaDescription !== 'undefined' ? metaDescription : 'Original Hawaii and Maui art prints from Wailea Art.' %>">
+  <meta property="og:url" content="<%= siteUrl %><%= typeof canonicalPath !== 'undefined' ? canonicalPath : '' %>">
+  <% if (typeof ogImage !== 'undefined' && ogImage) { %>
+  <meta property="og:image" content="<%= siteUrl %><%= ogImage %>">
+  <% } %>
+  <meta name="twitter:card" content="summary_large_image">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Structured data: helps Google understand this is a Hawaii-based art business -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ArtGallery",
+    "name": "Wailea Art",
+    "url": "<%= siteUrl %>",
+    "description": "Original Hawaii and Maui art prints, available retail and in bulk, from Wailea Art.",
+    "address": {
+      "@type": "PostalAddress",
+      "addressRegion": "HI",
+      "addressLocality": "Wailea",
+      "addressCountry": "US"
+    },
+    "areaServed": ["Wailea", "Maui", "Kapalua", "Lahaina", "Oahu", "Honolulu", "Kauai", "Big Island", "Hawaii"]
+  }
+  </script>
 </head>
 <body>
   <header class="site-header">
