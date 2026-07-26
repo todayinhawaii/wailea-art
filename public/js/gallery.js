@@ -45,7 +45,7 @@
     modalError.classList.add('hidden');
 
     modalTitle.textContent = data.title;
-    modalDimensions.textContent = data.dimensions || '';
+    modalDimensions.textContent = [data.dimensions, data.material].filter(Boolean).join(' · ');
     [...modeToggle.children].forEach(b => b.classList.toggle('active', b.dataset.mode === 'retail'));
     [...packagingToggle.children].forEach(b => b.classList.toggle('active', b.dataset.packaging === '1'));
     packagingGroup.classList.add('hidden');
@@ -65,6 +65,7 @@
         id: btn.dataset.id,
         title: btn.dataset.title,
         dimensions: btn.dataset.dimensions,
+        material: btn.dataset.material,
         retail: parseFloat(btn.dataset.retail),
         bulkPkg: parseFloat(btn.dataset.bulkPkg),
         bulkNoPkg: parseFloat(btn.dataset.bulkNopkg)

@@ -15,6 +15,7 @@ db.exec(`
     description TEXT DEFAULT '',
     image_path TEXT NOT NULL,
     dimensions TEXT NOT NULL DEFAULT '8.5" x 11"',
+    material TEXT NOT NULL DEFAULT '',
     price_retail REAL NOT NULL DEFAULT 45.00,
     price_bulk_packaging REAL NOT NULL DEFAULT 30.00,
     price_bulk_no_packaging REAL NOT NULL DEFAULT 25.00,
@@ -49,6 +50,9 @@ db.exec(`
 const artworkCols = db.prepare("PRAGMA table_info(artworks)").all().map(c => c.name);
 if (!artworkCols.includes('dimensions')) {
   db.exec(`ALTER TABLE artworks ADD COLUMN dimensions TEXT NOT NULL DEFAULT '8.5" x 11"'`);
+}
+if (!artworkCols.includes('material')) {
+  db.exec(`ALTER TABLE artworks ADD COLUMN material TEXT NOT NULL DEFAULT ''`);
 }
 
 module.exports = db;

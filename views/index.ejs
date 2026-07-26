@@ -29,7 +29,7 @@
           </div>
           <div class="card-body">
             <h3 class="card-title"><%= art.title %></h3>
-            <p class="card-dimensions"><%= art.dimensions %></p>
+            <p class="card-dimensions"><%= art.dimensions %><% if (art.material) { %> &middot; <%= art.material %><% } %></p>
             <% if (art.description) { %>
               <p class="card-desc"><%= art.description %></p>
             <% } %>
@@ -41,6 +41,7 @@
               data-id="<%= art.id %>"
               data-title="<%= art.title %>"
               data-dimensions="<%= art.dimensions %>"
+              data-material="<%= art.material %>"
               data-image="<%= art.image_path %>"
               data-retail="<%= art.price_retail %>"
               data-bulk-pkg="<%= art.price_bulk_packaging %>"

@@ -137,7 +137,7 @@ function titleFromFilename(filename) {
 }
 
 router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
-  const { title, description, dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
+  const { title, description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
 
   if (!title || !req.file) {
@@ -150,13 +150,14 @@ router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
   const position = (maxPos === null ? 0 : maxPos + 1);
 
   const result = db.prepare(`
-    INSERT INTO artworks (title, description, image_path, dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO artworks (title, description, image_path, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     title.trim(),
     (description || '').trim(),
     `/uploads/${req.file.filename}`,
     (dimensions || '').trim() || '8.5" x 11"',
+    (material || '').trim(),
     parseFloat(price_retail) || 45.00,
     parseFloat(price_bulk_packaging) || 30.00,
     parseFloat(price_bulk_no_packaging) || 25.00,
@@ -169,7 +170,7 @@ router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
 });
 
 router.post('/artworks/bulk', requireAdmin, upload.array('images', 60), (req, res) => {
-  const { dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
+  const { description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
 
   if (!req.files || req.files.length === 0) {
@@ -182,16 +183,17 @@ router.post('/artworks/bulk', requireAdmin, upload.array('images', 60), (req, re
   let position = (maxPos === null ? 0 : maxPos + 1);
 
   const insert = db.prepare(`
-    INSERT INTO artworks (title, description, image_path, dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO artworks (title, description, image_path, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   req.files.forEach(file => {
     const result = insert.run(
       titleFromFilename(file.originalname),
-      '',
+      (description || '').trim(),
       `/uploads/${file.filename}`,
       (dimensions || '').trim() || '8.5" x 11"',
+      (material || '').trim(),
       parseFloat(price_retail) || 45.00,
       parseFloat(price_bulk_packaging) || 30.00,
       parseFloat(price_bulk_no_packaging) || 25.00,
@@ -219,7 +221,7 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   if (!artwork) return res.redirect('/admin');
 
-  const { title, description, dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
+  const { title, description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
 
   if (!title || !title.trim()) {
@@ -239,7 +241,7 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
 
   db.prepare(`
     UPDATE artworks
-    SET title = ?, description = ?, image_path = ?, dimensions = ?,
+    SET title = ?, description = ?, image_path = ?, dimensions = ?, material = ?,
         price_retail = ?, price_bulk_packaging = ?, price_bulk_no_packaging = ?
     WHERE id = ?
   `).run(
@@ -247,6 +249,7 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
     (description || '').trim(),
     imagePath,
     (dimensions || '').trim() || '8.5" x 11"',
+    (material || '').trim(),
     parseFloat(price_retail) || 45.00,
     parseFloat(price_bulk_packaging) || 30.00,
     parseFloat(price_bulk_no_packaging) || 25.00,

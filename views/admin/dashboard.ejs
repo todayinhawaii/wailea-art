@@ -34,6 +34,10 @@
             <input type="text" id="dimensions" name="dimensions" placeholder='8.5" x 11"' value='8.5" x 11"'>
           </div>
           <div class="field-group">
+            <label for="material">Material</label>
+            <input type="text" id="material" name="material" placeholder="e.g. Giclée print on fine art paper">
+          </div>
+          <div class="field-group">
             <label for="image">Image (JPG, PNG, or WEBP)</label>
             <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp" required>
           </div>
@@ -91,6 +95,16 @@
           <div class="field-group">
             <label for="bulk_dimensions">Dimensions (applied to all)</label>
             <input type="text" id="bulk_dimensions" name="dimensions" placeholder='8.5" x 11"' value='8.5" x 11"'>
+          </div>
+
+          <div class="field-group">
+            <label for="bulk_material">Material (optional, applied to all)</label>
+            <input type="text" id="bulk_material" name="material" placeholder="e.g. Giclée print on fine art paper">
+          </div>
+
+          <div class="field-group">
+            <label for="bulk_description">Description (optional, applied to all)</label>
+            <textarea id="bulk_description" name="description" rows="3"></textarea>
           </div>
 
           <% if (categories.length > 0) { %>
