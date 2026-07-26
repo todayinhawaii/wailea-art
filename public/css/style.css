@@ -352,6 +352,30 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   margin-bottom: 1.4em;
 }
 
+.post-hero {
+  width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 20px 0 30px;
+  background: var(--sand-line);
+}
+.post-hero img { width: 100%; display: block; }
+
+.post-content { font-size: 1.02rem; line-height: 1.7; color: var(--ink); }
+.post-content h2 { font-family: 'Fraunces', Georgia, serif; font-size: 1.5rem; margin: 1.4em 0 0.5em; }
+.post-content h3 { font-family: 'Fraunces', Georgia, serif; font-size: 1.2rem; margin: 1.2em 0 0.5em; }
+.post-content p { margin: 0 0 1em; }
+.post-content img { max-width: 100%; border-radius: var(--radius); margin: 1em 0; }
+.post-content blockquote {
+  border-left: 3px solid var(--ocean);
+  margin: 1.2em 0;
+  padding: 0.2em 0 0.2em 18px;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.post-content ul, .post-content ol { margin: 0 0 1em; padding-left: 1.4em; }
+.post-content a { text-decoration: underline; }
+
 form.stack .field-group { margin: 0 0 16px; }
 .alert {
   padding: 12px 16px;

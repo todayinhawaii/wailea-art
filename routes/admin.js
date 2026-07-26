@@ -7,6 +7,7 @@ const db = require('../db');
 const upload = require('../lib/upload');
 const requireAdmin = require('../lib/requireAdmin');
 const slugify = require('../lib/slugify');
+const excerptFromHtml = require('../lib/excerpt');
 
 // ---------- Login ----------
 
@@ -60,7 +61,8 @@ function dashboardData() {
   return {
     artworks: getArtworksWithCategories(),
     categories: db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all(),
-    messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all()
+    messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all(),
+    posts: db.prepare('SELECT * FROM posts ORDER BY published_at DESC').all()
   };
 }
 
@@ -295,6 +297,94 @@ router.post('/artworks/:id/move', requireAdmin, (req, res) => {
   });
   tx(newOrder);
 
+  res.redirect('/admin');
+});
+
+// ---------- Blog posts ----------
+
+function uniqueSlug(title, ignoreId) {
+  let base = slugify(title) || 'post';
+  let finalSlug = base;
+  let n = 2;
+  while (true) {
+    const existing = db.prepare('SELECT id FROM posts WHERE slug = ?').get(finalSlug);
+    if (!existing || existing.id === ignoreId) break;
+    finalSlug = `${base}-${n}`;
+    n++;
+  }
+  return finalSlug;
+}
+
+router.get('/posts/new', requireAdmin, (req, res) => {
+  res.render('admin/post-form', { post: null, error: null, page: 'admin' });
+});
+
+router.post('/posts', requireAdmin, upload.single('featured_image'), (req, res) => {
+  const { title, excerpt, content } = req.body;
+
+  if (!title || !title.trim() || !req.file) {
+    return res.render('admin/post-form', {
+      post: null, error: 'Title and a featured image are required.', page: 'admin'
+    });
+  }
+
+  const slug = uniqueSlug(title.trim());
+  const finalExcerpt = (excerpt || '').trim() || excerptFromHtml(content);
+
+  db.prepare(`
+    INSERT INTO posts (title, slug, featured_image, excerpt, content, published_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+  `).run(
+    title.trim(),
+    slug,
+    `/uploads/${req.file.filename}`,
+    finalExcerpt,
+    content || ''
+  );
+
+  res.redirect('/admin');
+});
+
+router.get('/posts/:id/edit', requireAdmin, (req, res) => {
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
+  if (!post) return res.redirect('/admin');
+  res.render('admin/post-form', { post, error: null, page: 'admin' });
+});
+
+router.post('/posts/:id', requireAdmin, upload.single('featured_image'), (req, res) => {
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
+  if (!post) return res.redirect('/admin');
+
+  const { title, excerpt, content } = req.body;
+  if (!title || !title.trim()) {
+    return res.render('admin/post-form', { post, error: 'Title is required.', page: 'admin' });
+  }
+
+  let featuredImage = post.featured_image;
+  if (req.file) {
+    featuredImage = `/uploads/${req.file.filename}`;
+    const oldFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(post.featured_image));
+    fs.unlink(oldFile, () => {});
+  }
+
+  const slug = title.trim() === post.title ? post.slug : uniqueSlug(title.trim(), post.id);
+  const finalExcerpt = (excerpt || '').trim() || excerptFromHtml(content);
+
+  db.prepare(`
+    UPDATE posts SET title = ?, slug = ?, featured_image = ?, excerpt = ?, content = ?
+    WHERE id = ?
+  `).run(title.trim(), slug, featuredImage, finalExcerpt, content || '', post.id);
+
+  res.redirect('/admin');
+});
+
+router.post('/posts/:id/delete', requireAdmin, (req, res) => {
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
+  if (post) {
+    const oldFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(post.featured_image));
+    fs.unlink(oldFile, () => {});
+  }
+  db.prepare('DELETE FROM posts WHERE id = ?').run(req.params.id);
   res.redirect('/admin');
 });
 

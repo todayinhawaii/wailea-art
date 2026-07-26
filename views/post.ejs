@@ -1,0 +1,40 @@
+<% pageTitle = post.title + ' | Wailea Art Journal' %>
+<% metaDescription = post.excerpt %>
+<% canonicalPath = '/blog/' + post.slug %>
+<% ogImage = post.featured_image %>
+<%- include('partials/header') %>
+
+<main class="wrap">
+  <div class="page-content" style="max-width: 760px;">
+    <p style="color: var(--ink-soft); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em;">
+      <%= new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %>
+    </p>
+    <h1><%= post.title %></h1>
+
+    <div class="post-hero">
+      <img src="<%= post.featured_image %>" alt="<%= post.title %>">
+    </div>
+
+    <div class="post-content">
+      <%- post.content %>
+    </div>
+
+    <p style="margin-top: 40px;"><a href="/blog">&larr; Back to the Journal</a></p>
+  </div>
+</main>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": <%- JSON.stringify(post.title) %>,
+  "image": "<%= siteUrl %><%= post.featured_image %>",
+  "datePublished": "<%= post.published_at %>",
+  "description": <%- JSON.stringify(post.excerpt) %>,
+  "author": { "@type": "Organization", "name": "Wailea Art" },
+  "publisher": { "@type": "Organization", "name": "Wailea Art" },
+  "mainEntityOfPage": "<%= siteUrl %>/blog/<%= post.slug %>"
+}
+</script>
+
+<%- include('partials/footer') %>

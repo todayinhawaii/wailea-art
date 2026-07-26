@@ -1,0 +1,36 @@
+<% pageTitle = 'Journal | Wailea Art — Hawaii & Maui Art Stories' %>
+<% metaDescription = 'Stories, inspiration, and behind-the-scenes from Wailea Art — a Maui-based art studio creating original Hawaii art prints.' %>
+<% canonicalPath = '/blog' %>
+<% if (posts.length > 0) { ogImage = posts[0].featured_image } %>
+<%- include('partials/header') %>
+
+<main class="wrap">
+  <div class="intro">
+    <h1>Journal</h1>
+    <p>Stories and inspiration from a Hawaii-based art studio — Maui, the islands, and the process behind the prints.</p>
+  </div>
+
+  <% if (posts.length === 0) { %>
+    <div class="empty-state">
+      <p>New stories are on their way — check back soon.</p>
+    </div>
+  <% } else { %>
+    <div class="gallery">
+      <% posts.forEach(function(post) { %>
+        <div class="card">
+          <a href="/blog/<%= post.slug %>" class="card-img" style="display:flex;">
+            <img src="<%= post.featured_image %>" alt="<%= post.title %>" loading="lazy">
+          </a>
+          <div class="card-body">
+            <h3 class="card-title"><a href="/blog/<%= post.slug %>" style="color:inherit;"><%= post.title %></a></h3>
+            <p class="card-dimensions"><%= new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></p>
+            <p class="card-desc"><%= post.excerpt %></p>
+            <a class="btn btn-secondary btn-block" href="/blog/<%= post.slug %>">Read more</a>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+</main>
+
+<%- include('partials/footer') %>

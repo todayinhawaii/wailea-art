@@ -174,6 +174,32 @@
       </div>
 
       <div class="admin-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Blog posts</h3>
+          <a class="btn btn-secondary btn-sm" href="/admin/posts/new">Write new post</a>
+        </div>
+        <p style="color: var(--ink-soft); font-size: 0.85rem;">These show up on your Journal page.</p>
+
+        <% if (posts.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No posts yet — write your first one.</p>
+        <% } else { %>
+          <div class="category-manage-list">
+            <% posts.forEach(function(p) { %>
+              <div class="category-manage-item">
+                <span><%= p.title %></span>
+                <div class="item-actions">
+                  <a class="btn btn-secondary btn-sm" href="/admin/posts/<%= p.id %>/edit">Edit</a>
+                  <form method="POST" action="/admin/posts/<%= p.id %>/delete" onsubmit="return confirm('Delete this post? This cannot be undone.');">
+                    <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                  </form>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="admin-card">
         <h3>Messages</h3>
         <% if (messages.length === 0) { %>
           <p style="color: var(--ink-soft); font-size: 0.9rem;">No messages yet.</p>
