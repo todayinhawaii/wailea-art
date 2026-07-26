@@ -82,7 +82,9 @@ function normalizeCategoryIds(raw) {
 // ---------- Dashboard ----------
 
 router.get('/', requireAdmin, (req, res) => {
-  res.render('admin/dashboard', { ...dashboardData(), error: null, page: 'admin' });
+  const bulkAdded = parseInt(req.query.bulkAdded, 10);
+  const success = bulkAdded ? `Added ${bulkAdded} piece${bulkAdded === 1 ? '' : 's'} to your gallery. Click "Edit" on each to add a title, description, or categories.` : null;
+  res.render('admin/dashboard', { ...dashboardData(), error: null, success, page: 'admin' });
 });
 
 // ---------- Categories ----------
@@ -90,12 +92,12 @@ router.get('/', requireAdmin, (req, res) => {
 router.post('/categories', requireAdmin, (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) {
-    return res.render('admin/dashboard', { ...dashboardData(), error: 'Category name is required.', page: 'admin' });
+    return res.render('admin/dashboard', { ...dashboardData(), error: 'Category name is required.', success: null, page: 'admin' });
   }
 
   let slug = slugify(name);
   if (!slug) {
-    return res.render('admin/dashboard', { ...dashboardData(), error: 'Please use a category name with letters or numbers.', page: 'admin' });
+    return res.render('admin/dashboard', { ...dashboardData(), error: 'Please use a category name with letters or numbers.', success: null, page: 'admin' });
   }
 
   // ensure slug uniqueness
@@ -112,7 +114,7 @@ router.post('/categories', requireAdmin, (req, res) => {
   try {
     db.prepare('INSERT INTO categories (name, slug, position) VALUES (?, ?, ?)').run(name.trim(), finalSlug, position);
   } catch (err) {
-    return res.render('admin/dashboard', { ...dashboardData(), error: 'That category already exists.', page: 'admin' });
+    return res.render('admin/dashboard', { ...dashboardData(), error: 'That category already exists.', success: null, page: 'admin' });
   }
 
   res.redirect('/admin');
@@ -125,13 +127,22 @@ router.post('/categories/:id/delete', requireAdmin, (req, res) => {
 
 // ---------- Artworks ----------
 
+function titleFromFilename(filename) {
+  const base = path.parse(filename).name;
+  const spaced = base.replace(/[-_]+/g, ' ').trim();
+  return spaced
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ') || 'Untitled';
+}
+
 router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
   const { title, description, dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
 
   if (!title || !req.file) {
     return res.render('admin/dashboard', {
-      ...dashboardData(), error: 'Title and image are required.', page: 'admin'
+      ...dashboardData(), error: 'Title and image are required.', success: null, page: 'admin'
     });
   }
 
@@ -155,6 +166,42 @@ router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
   if (categoryIds.length) setArtworkCategories(result.lastInsertRowid, categoryIds);
 
   res.redirect('/admin');
+});
+
+router.post('/artworks/bulk', requireAdmin, upload.array('images', 60), (req, res) => {
+  const { dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
+  const categoryIds = normalizeCategoryIds(req.body.category_ids);
+
+  if (!req.files || req.files.length === 0) {
+    return res.render('admin/dashboard', {
+      ...dashboardData(), error: 'Please choose at least one image to bulk add.', success: null, page: 'admin'
+    });
+  }
+
+  const maxPos = db.prepare('SELECT MAX(position) AS m FROM artworks').get().m;
+  let position = (maxPos === null ? 0 : maxPos + 1);
+
+  const insert = db.prepare(`
+    INSERT INTO artworks (title, description, image_path, dimensions, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  req.files.forEach(file => {
+    const result = insert.run(
+      titleFromFilename(file.originalname),
+      '',
+      `/uploads/${file.filename}`,
+      (dimensions || '').trim() || '8.5" x 11"',
+      parseFloat(price_retail) || 45.00,
+      parseFloat(price_bulk_packaging) || 30.00,
+      parseFloat(price_bulk_no_packaging) || 25.00,
+      position
+    );
+    position++;
+    if (categoryIds.length) setArtworkCategories(result.lastInsertRowid, categoryIds);
+  });
+
+  res.redirect(`/admin?bulkAdded=${req.files.length}`);
 });
 
 router.get('/artworks/:id/edit', requireAdmin, (req, res) => {

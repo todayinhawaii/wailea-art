@@ -147,8 +147,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 @media (max-width: 900px) {
   .gallery { grid-template-columns: repeat(2, 1fr); gap: 22px; }
 }
-@media (max-width: 560px) {
-  .gallery { grid-template-columns: 1fr; }
+@media (max-width: 680px) {
+  .gallery { grid-template-columns: 1fr; gap: 26px; }
 }
 
 .card {
@@ -164,14 +164,17 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .card:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(43,37,32,0.10); }
 
 .card-img {
-  aspect-ratio: 8.5 / 11;
+  aspect-ratio: 4 / 5;
   width: 100%;
   overflow: hidden;
   background: var(--sand-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .card-img img {
   width: 100%; height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -468,6 +471,28 @@ form.stack .field-group { margin: 0 0 16px; }
   cursor: pointer;
 }
 .checkbox-pill input { margin: 0; }
+
+.dropzone {
+  border: 2px dashed var(--sand-line);
+  border-radius: var(--radius);
+  padding: 28px 18px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--sand);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dropzone:hover { border-color: var(--ocean); }
+.dropzone-active { border-color: var(--ocean); background: var(--card); }
+.dropzone-filelist {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  max-height: 80px;
+  overflow-y: auto;
+  word-break: break-word;
+}
 
 .category-manage-list { display: flex; flex-direction: column; gap: 8px; }
 .category-manage-item {
