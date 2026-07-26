@@ -6,6 +6,11 @@ const session = require('express-session');
 
 const app = express();
 
+// Render (and most hosts) sit in front of the app as a reverse proxy that
+// terminates HTTPS. Without this, Express can't reliably tell the connection
+// is secure, which can cause login sessions to fail to "stick."
+app.set('trust proxy', 1);
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -21,7 +26,8 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     maxAge: 1000 * 60 * 60 * 12, // 12 hours
-    secure: process.env.NODE_ENV === 'production'
+    secure: 'auto',
+    sameSite: 'lax'
   }
 }));
 
