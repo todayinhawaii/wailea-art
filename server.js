@@ -20,6 +20,18 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'data', 'uploads')));
 
+// Belt-and-suspenders fix: explicitly tell every layer between the server and
+// the visitor (browser, Render's edge, any proxy) to never cache these HTML
+// pages. Without this, a page update can appear "stuck" on old content even
+// after a successful deploy, because nothing told the cache it was allowed
+// to hold onto the response in the first place.
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
   resave: false,
