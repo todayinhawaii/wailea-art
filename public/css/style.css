@@ -358,6 +358,14 @@ form.stack .field-group { margin: 0 0 16px; }
 }
 .alert-success { background: #e4efe3; color: #2f5c30; border: 1px solid #c3dcc1; }
 .alert-error { background: #f4e0dc; color: var(--danger); border: 1px solid #e3bdb4; }
+.login-box .alert-error {
+  background: #d9534f;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 14px 16px;
+}
 
 /* ---------- footer ---------- */
 .site-footer {

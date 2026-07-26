@@ -21,14 +21,14 @@ router.post('/login', (req, res) => {
   const plainPassword = process.env.ADMIN_PASSWORD || '';
   const adminHash = process.env.ADMIN_PASS_HASH || '';
 
-  const validUser = username === adminUser;
+  const validUser = (username || '').trim() === adminUser.trim();
 
   let validPass = false;
   if (plainPassword) {
     // Simple direct comparison — easiest to set up correctly in Render.
-    validPass = password === plainPassword;
+    validPass = (password || '').trim() === plainPassword.trim();
   } else if (adminHash) {
-    validPass = bcrypt.compareSync(password || '', adminHash);
+    validPass = bcrypt.compareSync((password || '').trim(), adminHash);
   }
 
   if (!validUser || !validPass) {
