@@ -18,10 +18,18 @@ router.get('/login', (req, res) => {
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
   const adminUser = process.env.ADMIN_USER || 'admin';
+  const plainPassword = process.env.ADMIN_PASSWORD || '';
   const adminHash = process.env.ADMIN_PASS_HASH || '';
 
   const validUser = username === adminUser;
-  const validPass = adminHash && bcrypt.compareSync(password || '', adminHash);
+
+  let validPass = false;
+  if (plainPassword) {
+    // Simple direct comparison — easiest to set up correctly in Render.
+    validPass = password === plainPassword;
+  } else if (adminHash) {
+    validPass = bcrypt.compareSync(password || '', adminHash);
+  }
 
   if (!validUser || !validPass) {
     return res.render('admin/login', { error: 'Incorrect username or password.', page: 'admin' });

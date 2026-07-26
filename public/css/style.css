@@ -265,6 +265,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .field-group input[type=number],
 .field-group input[type=text],
 .field-group input[type=email],
+.field-group input[type=password],
 .field-group textarea {
   width: 100%;
   padding: 10px 12px;
@@ -275,6 +276,26 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   font-size: 0.95rem;
   color: var(--ink);
 }
+.password-wrapper { position: relative; }
+.password-wrapper input[type=password],
+.password-wrapper input[type=text] {
+  padding-right: 44px;
+}
+.password-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.password-toggle:hover { color: var(--ink); }
 .toggle-row {
   display: flex;
   gap: 8px;
