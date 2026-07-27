@@ -1,7 +1,53 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { BULK_MIN_QTY } = require('../lib/pricing');
+const { BULK_MIN_QTY, resolveOrder } = require('../lib/pricing');
+
+let stripe = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+}
+
+// This exact list came directly from Stripe's own API (their error message
+// when an invalid code is passed helpfully lists every valid one) — so this
+// is guaranteed to match what Stripe currently supports for shipping.
+const SHIPPABLE_COUNTRIES = [
+  'AC','AD','AE','AF','AG','AI','AL','AM','AO','AQ','AR','AT','AU','AW','AX','AZ',
+  'BA','BB','BD','BE','BF','BG','BH','BI','BJ','BL','BM','BN','BO','BQ','BR','BS','BT','BV','BW','BY','BZ',
+  'CA','CD','CF','CG','CH','CI','CK','CL','CM','CN','CO','CR','CV','CW','CY','CZ',
+  'DE','DJ','DK','DM','DO','DZ',
+  'EC','EE','EG','EH','ER','ES','ET',
+  'FI','FJ','FK','FO','FR',
+  'GA','GB','GD','GE','GF','GG','GH','GI','GL','GM','GN','GP','GQ','GR','GS','GT','GU','GW','GY',
+  'HK','HN','HR','HT','HU',
+  'ID','IE','IL','IM','IN','IO','IQ','IS','IT',
+  'JE','JM','JO','JP',
+  'KE','KG','KH','KI','KM','KN','KR','KW','KY','KZ',
+  'LA','LB','LC','LI','LK','LR','LS','LT','LU','LV','LY',
+  'MA','MC','MD','ME','MF','MG','MK','ML','MM','MN','MO','MQ','MR','MS','MT','MU','MV','MW','MX','MY','MZ',
+  'NA','NC','NE','NG','NI','NL','NO','NP','NR','NU','NZ',
+  'OM',
+  'PA','PE','PF','PG','PH','PK','PL','PM','PN','PR','PS','PT','PY',
+  'QA',
+  'RE','RO','RS','RU','RW',
+  'SA','SB','SC','SD','SE','SG','SH','SI','SJ','SK','SL','SM','SN','SO','SR','SS','ST','SV','SX','SZ',
+  'TA','TC','TD','TF','TG','TH','TJ','TK','TL','TM','TN','TO','TR','TT','TV','TW','TZ',
+  'UA','UG','US','UY','UZ',
+  'VA','VC','VE','VG','VN','VU',
+  'WF','WS',
+  'XK',
+  'YE','YT',
+  'ZA','ZM','ZW','ZZ'
+];
+
+// Flat shipping rates — easy to adjust here any time.
+// Retail = a single mailed print; Bulk = a heavier box shipment (10+ pieces);
+// Canvas = a single rolled canvas shipped in a protective tube.
+const SHIPPING_RATES = {
+  retail: 6.95,
+  bulk: 24.95,
+  canvas: 14.95
+};
 
 router.get('/sitemap.xml', (req, res) => {
   const siteUrl = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
@@ -69,22 +115,4 @@ router.post('/contact', (req, res) => {
 });
 
 router.get('/blog', (req, res) => {
-  const posts = db.prepare('SELECT * FROM posts ORDER BY published_at DESC').all();
-  res.render('blog', { posts, page: 'blog' });
-});
-
-router.get('/blog/:slug', (req, res, next) => {
-  const post = db.prepare('SELECT * FROM posts WHERE slug = ?').get(req.params.slug);
-  if (!post) return next();
-  res.render('post', { post, page: 'blog' });
-});
-
-router.get('/checkout/success', (req, res) => {
-  res.render('checkout-result', { page: 'checkout', success: true });
-});
-
-router.get('/checkout/cancel', (req, res) => {
-  res.render('checkout-result', { page: 'checkout', success: false });
-});
-
-module.exports = router;
+  const posts = db.prepare('SELECT * FROM posts ORDER BY published_at
