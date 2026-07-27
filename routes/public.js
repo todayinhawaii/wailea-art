@@ -115,4 +115,92 @@ router.post('/contact', (req, res) => {
 });
 
 router.get('/blog', (req, res) => {
-  const posts = db.prepare('SELECT * FROM posts ORDER BY published_at
+  const posts = db.prepare('SELECT * FROM posts ORDER BY published_at DESC').all();
+  res.render('blog', { posts, page: 'blog' });
+});
+
+router.get('/blog/:slug', (req, res, next) => {
+  const post = db.prepare('SELECT * FROM posts WHERE slug = ?').get(req.params.slug);
+  if (!post) return next();
+  res.render('post', { post, page: 'blog' });
+});
+
+router.get('/checkout/success', (req, res) => {
+  res.render('checkout-result', { page: 'checkout', success: true });
+});
+
+router.get('/checkout/cancel', (req, res) => {
+  res.render('checkout-result', { page: 'checkout', success: false });
+});
+
+router.post('/api/checkout', async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Payments are not configured yet. Add STRIPE_SECRET_KEY.' });
+    }
+
+    const { artworkId, mode, packaging, quantity } = req.body;
+    const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(artworkId);
+    if (!artwork) return res.status(404).json({ error: 'Artwork not found.' });
+
+    const resolved = resolveOrder(artwork, mode, !!packaging, quantity);
+    if (!resolved.ok) return res.status(400).json({ error: resolved.error });
+
+    const siteUrl = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
+
+    const shippingKey = artwork.ships_as_canvas ? 'canvas' : mode;
+    const shippingLabel = artwork.ships_as_canvas
+      ? 'Rolled canvas shipping'
+      : (mode === 'bulk' ? 'Bulk shipping' : 'Standard shipping');
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          quantity: resolved.quantity,
+          price_data: {
+            currency: 'usd',
+            unit_amount: Math.round(resolved.unitPrice * 100),
+            product_data: {
+              name: `${artwork.title} — ${resolved.label}`,
+              description: artwork.dimensions ? `${artwork.dimensions} art print` : 'Art print',
+              images: artwork.image_path.startsWith('http')
+                ? [artwork.image_path]
+                : [`${siteUrl}${artwork.image_path}`]
+            }
+          }
+        }
+      ],
+      // Collect a real shipping address since this is a physical, mailed product —
+      // without this, Stripe only collects payment info, not where to send the art.
+      shipping_address_collection: {
+        allowed_countries: SHIPPABLE_COUNTRIES
+      },
+      shipping_options: [
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: {
+              amount: Math.round(SHIPPING_RATES[shippingKey] * 100),
+              currency: 'usd'
+            },
+            display_name: shippingLabel
+          }
+        }
+      ],
+      phone_number_collection: {
+        enabled: true
+      },
+      success_url: `${siteUrl}/checkout/success`,
+      cancel_url: `${siteUrl}/checkout/cancel`
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Checkout error:', err);
+    res.status(500).json({ error: 'Something went wrong creating your checkout session.' });
+  }
+});
+
+module.exports = router;
