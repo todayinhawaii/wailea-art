@@ -1,0 +1,332 @@
+<% pageTitle = 'Admin — Wailea Art' %>
+<%- include('../partials/header') %>
+
+<main class="wrap admin-shell">
+  <div class="admin-header">
+    <h1 style="margin:0;">Admin</h1>
+    <form method="POST" action="/admin/logout">
+      <button class="btn btn-secondary btn-sm" type="submit">Log out</button>
+    </form>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+  <% if (typeof success !== 'undefined' && success) { %>
+    <div class="alert alert-success"><%= success %></div>
+  <% } %>
+
+  <div class="admin-grid">
+    <div>
+      <div class="admin-card">
+        <h3>Add new art</h3>
+        <form method="POST" action="/admin/artworks" enctype="multipart/form-data" class="stack">
+          <div class="field-group">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" required>
+          </div>
+          <div class="field-group">
+            <label for="description">Description (optional)</label>
+            <textarea id="description" name="description" rows="3"></textarea>
+          </div>
+          <div class="field-group">
+            <label for="dimensions">Dimensions</label>
+            <input type="text" id="dimensions" name="dimensions" placeholder='8.5" x 11"' value='8.5" x 11"'>
+          </div>
+          <div class="field-group">
+            <label for="material">Material</label>
+            <input type="text" id="material" name="material" placeholder="e.g. Giclée print on fine art paper">
+          </div>
+          <div class="field-group">
+            <label class="checkbox-pill" style="width: fit-content;">
+              <input type="checkbox" name="ships_as_canvas" value="1">
+              <span>This ships as a rolled canvas (in a tube)</span>
+            </label>
+          <div class="field-group">
+            <label for="image">Image (JPG, PNG, or WEBP)</label>
+            <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp" required>
+          </div>
+
+          <% if (categories.length > 0) { %>
+            <div class="field-group">
+              <label>Categories (optional, choose any that apply)</label>
+              <div class="checkbox-grid">
+                <% categories.forEach(function(cat) { %>
+                  <label class="checkbox-pill">
+                    <input type="checkbox" name="category_ids" value="<%= cat.id %>">
+                    <span><%= cat.name %></span>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          <% } %>
+
+          <div class="field-group">
+            <label>Pricing (defaults are prefilled — change only if this piece differs)</label>
+            <div class="price-inputs">
+              <div>
+                <label for="price_retail" style="margin-bottom:4px;">Retail</label>
+                <input type="number" step="0.01" id="price_retail" name="price_retail" value="45.00">
+              </div>
+              <div>
+                <label for="price_bulk_packaging" style="margin-bottom:4px;">Bulk, packaged</label>
+                <input type="number" step="0.01" id="price_bulk_packaging" name="price_bulk_packaging" value="30.00">
+              </div>
+              <div>
+                <label for="price_bulk_no_packaging" style="margin-bottom:4px;">Bulk, no packaging</label>
+                <input type="number" step="0.01" id="price_bulk_no_packaging" name="price_bulk_no_packaging" value="25.00">
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-block" type="submit">Add to gallery</button>
+        </form>
+      </div>
+
+      <div class="admin-card">
+        <h3>Bulk add art</h3>
+        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">Drag in a batch of images at once (all the same dimensions/pricing/categories). Each becomes its own gallery piece, titled from its filename — edit each one afterward to fine-tune.</p>
+
+        <form method="POST" action="/admin/artworks/bulk" enctype="multipart/form-data" class="stack">
+          <div class="field-group">
+            <label>Images</label>
+            <div class="dropzone" id="bulkDropzone">
+              <div id="dropzoneText">Drag images here, or click to browse</div>
+              <div id="dropzoneFileList" class="dropzone-filelist"></div>
+            </div>
+            <input type="file" id="bulkImages" name="images" accept="image/jpeg,image/png,image/webp" multiple hidden required>
+          </div>
+
+          <div class="field-group">
+            <label for="bulk_dimensions">Dimensions (applied to all)</label>
+            <input type="text" id="bulk_dimensions" name="dimensions" placeholder='8.5" x 11"' value='8.5" x 11"'>
+          </div>
+
+          <div class="field-group">
+            <label for="bulk_material">Material (optional, applied to all)</label>
+            <input type="text" id="bulk_material" name="material" placeholder="e.g. Giclée print on fine art paper">
+          </div>
+          <div class="field-group">
+            <label class="checkbox-pill" style="width: fit-content;">
+              <input type="checkbox" name="ships_as_canvas" value="1">
+              <span>These all ship as rolled canvases (in a tube)</span>
+            </label>
+
+          <div class="field-group">
+            <label for="bulk_description">Description (optional, applied to all)</label>
+            <textarea id="bulk_description" name="description" rows="3"></textarea>
+          </div>
+
+          <% if (categories.length > 0) { %>
+            <div class="field-group">
+              <label>Categories (optional, applied to all)</label>
+              <div class="checkbox-grid">
+                <% categories.forEach(function(cat) { %>
+                  <label class="checkbox-pill">
+                    <input type="checkbox" name="category_ids" value="<%= cat.id %>">
+                    <span><%= cat.name %></span>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          <% } %>
+
+          <div class="field-group">
+            <label>Pricing (applied to all)</label>
+            <div class="price-inputs">
+              <div>
+                <label style="margin-bottom:4px;">Retail</label>
+                <input type="number" step="0.01" name="price_retail" value="45.00">
+              </div>
+              <div>
+                <label style="margin-bottom:4px;">Bulk, packaged</label>
+                <input type="number" step="0.01" name="price_bulk_packaging" value="30.00">
+              </div>
+              <div>
+                <label style="margin-bottom:4px;">Bulk, no packaging</label>
+                <input type="number" step="0.01" name="price_bulk_no_packaging" value="25.00">
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-block" type="submit" id="bulkSubmitBtn">Add all to gallery</button>
+        </form>
+      </div>
+
+      <div class="admin-card">
+        <h3>Categories</h3>
+        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">These show as pills at the top of your homepage.</p>
+
+        <% if (categories.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No categories yet — add your first one below.</p>
+        <% } else { %>
+          <div class="category-manage-list">
+            <% categories.forEach(function(cat) { %>
+              <div class="category-manage-item">
+                <span><%= cat.name %></span>
+                <form method="POST" action="/admin/categories/<%= cat.id %>/delete" onsubmit="return confirm('Delete this category? It will be removed from any art using it.');">
+                  <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                </form>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <form method="POST" action="/admin/categories" class="stack" style="margin-top:16px;">
+          <div class="field-group" style="display:flex; gap:10px; margin:0; align-items:flex-end;">
+            <div style="flex:1;">
+              <label for="cat_name">New category name</label>
+              <input type="text" id="cat_name" name="name" placeholder="e.g. Ocean" required>
+            </div>
+            <button class="btn btn-secondary" type="submit">Add</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="admin-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Blog posts</h3>
+          <a class="btn btn-secondary btn-sm" href="/admin/posts/new">Write new post</a>
+        </div>
+        <p style="color: var(--ink-soft); font-size: 0.85rem;">These show up on your Journal page.</p>
+
+        <% if (posts.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No posts yet — write your first one.</p>
+        <% } else { %>
+          <div class="category-manage-list">
+            <% posts.forEach(function(p) { %>
+              <div class="category-manage-item">
+                <span><%= p.title %></span>
+                <div class="item-actions">
+                  <a class="btn btn-secondary btn-sm" href="/admin/posts/<%= p.id %>/edit">Edit</a>
+                  <form method="POST" action="/admin/posts/<%= p.id %>/delete" onsubmit="return confirm('Delete this post? This cannot be undone.');">
+                    <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                  </form>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="admin-card">
+        <h3>Messages</h3>
+        <% if (messages.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No messages yet.</p>
+        <% } else { %>
+          <% messages.forEach(function(m) { %>
+            <div class="msg-item">
+              <div class="msg-meta"><%= m.name %> &middot; <%= m.email %> &middot; <%= m.created_at %></div>
+              <div class="msg-body"><%= m.message %></div>
+            </div>
+          <% }); %>
+        <% } %>
+      </div>
+    </div>
+
+    <div>
+      <div class="admin-card">
+        <h3>Gallery order</h3>
+        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">Drag pieces to reorder. Top of the list shows first on the homepage.</p>
+
+        <% if (artworks.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No art yet — add your first piece.</p>
+        <% } else { %>
+          <ul class="sortable-list" id="sortableList">
+            <% artworks.forEach(function(art) { %>
+              <li class="sortable-item" draggable="true" data-id="<%= art.id %>">
+                <span class="drag-handle">&#8942;&#8942;</span>
+                <img src="<%= art.image_path %>" alt="<%= art.title %>">
+                <div class="item-title">
+                  <div><%= art.title %></div>
+                  <div style="font-size:0.76rem; color:var(--ink-soft);">
+                    <%= art.dimensions %>
+                    <% if (art.categories && art.categories.length) { %>
+                      &middot; <%= art.categories.map(c => c.name).join(', ') %>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="item-actions">
+                  <a class="btn btn-secondary btn-sm" href="/admin/artworks/<%= art.id %>/edit">Edit</a>
+                  <form method="POST" action="/admin/artworks/<%= art.id %>/move">
+                    <input type="hidden" name="direction" value="top">
+                    <button class="btn btn-secondary btn-sm" type="submit">To top</button>
+                  </form>
+                  <form method="POST" action="/admin/artworks/<%= art.id %>/move">
+                    <input type="hidden" name="direction" value="bottom">
+                    <button class="btn btn-secondary btn-sm" type="submit">To bottom</button>
+                  </form>
+                  <form method="POST" action="/admin/artworks/<%= art.id %>/delete" onsubmit="return confirm('Delete this piece? This cannot be undone.');">
+                    <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                  </form>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <div style="display:flex; align-items:center; gap:14px; margin-top:14px;">
+            <button class="btn btn-primary" type="button" id="saveOrderBtn">Save order</button>
+            <span id="orderSaveStatus" style="font-size:0.85rem; opacity:0; transition:opacity 0.3s ease;"></span>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</main>
+
+<%- include('../partials/site-footer') %>
+<script src="/js/admin.js"></script>
+<script>
+  (function () {
+    const dropzone = document.getElementById('bulkDropzone');
+    const fileInput = document.getElementById('bulkImages');
+    const dropzoneText = document.getElementById('dropzoneText');
+    const fileList = document.getElementById('dropzoneFileList');
+    const submitBtn = document.getElementById('bulkSubmitBtn');
+    if (!dropzone) return;
+
+    function renderFileList(files) {
+      if (!files || files.length === 0) {
+        dropzoneText.textContent = 'Drag images here, or click to browse';
+        fileList.textContent = '';
+        return;
+      }
+      dropzoneText.textContent = `${files.length} image${files.length === 1 ? '' : 's'} ready to add:`;
+      fileList.textContent = Array.from(files).map(f => f.name).join(', ');
+    }
+
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => renderFileList(fileInput.files));
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dropzone-active');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dropzone-active');
+      });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files && files.length) {
+        fileInput.files = files;
+        renderFileList(files);
+      }
+    });
+
+    dropzone.closest('form').addEventListener('submit', () => {
+      if (fileInput.files.length > 0) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = `Adding ${fileInput.files.length} pieces…`;
+      }
+    });
+  })();
+</script>

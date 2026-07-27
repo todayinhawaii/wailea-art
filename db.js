@@ -16,6 +16,7 @@ db.exec(`
     image_path TEXT NOT NULL,
     dimensions TEXT NOT NULL DEFAULT '8.5" x 11"',
     material TEXT NOT NULL DEFAULT '',
+    ships_as_canvas INTEGER NOT NULL DEFAULT 0,
     price_retail REAL NOT NULL DEFAULT 45.00,
     price_bulk_packaging REAL NOT NULL DEFAULT 30.00,
     price_bulk_no_packaging REAL NOT NULL DEFAULT 25.00,
@@ -63,6 +64,9 @@ if (!artworkCols.includes('dimensions')) {
 }
 if (!artworkCols.includes('material')) {
   db.exec(`ALTER TABLE artworks ADD COLUMN material TEXT NOT NULL DEFAULT ''`);
+}
+if (!artworkCols.includes('ships_as_canvas')) {
+  db.exec(`ALTER TABLE artworks ADD COLUMN ships_as_canvas INTEGER NOT NULL DEFAULT 0`);
 }
 
 module.exports = db;

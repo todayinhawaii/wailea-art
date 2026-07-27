@@ -41,10 +41,12 @@ const SHIPPABLE_COUNTRIES = [
 ];
 
 // Flat shipping rates — easy to adjust here any time.
-// Retail = a single mailed print; Bulk = a heavier box shipment (10+ pieces).
+// Retail = a single mailed print; Bulk = a heavier box shipment (10+ pieces);
+// Canvas = a single rolled canvas shipped in a protective tube.
 const SHIPPING_RATES = {
   retail: 6.95,
-  bulk: 24.95
+  bulk: 24.95,
+  canvas: 14.95
 };
 
 router.post('/checkout', async (req, res) => {
@@ -61,6 +63,11 @@ router.post('/checkout', async (req, res) => {
     if (!resolved.ok) return res.status(400).json({ error: resolved.error });
 
     const siteUrl = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
+
+    const shippingKey = artwork.ships_as_canvas ? 'canvas' : mode;
+    const shippingLabel = artwork.ships_as_canvas
+      ? 'Rolled canvas shipping'
+      : (mode === 'bulk' ? 'Bulk shipping' : 'Standard shipping');
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -91,10 +98,10 @@ router.post('/checkout', async (req, res) => {
           shipping_rate_data: {
             type: 'fixed_amount',
             fixed_amount: {
-              amount: Math.round(SHIPPING_RATES[mode] * 100),
+              amount: Math.round(SHIPPING_RATES[shippingKey] * 100),
               currency: 'usd'
             },
-            display_name: mode === 'bulk' ? 'Bulk shipping' : 'Standard shipping'
+            display_name: shippingLabel
           }
         }
       ],
