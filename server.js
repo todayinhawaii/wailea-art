@@ -49,7 +49,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/', require('./routes/public'));
-app.use('/api', require('./routes/checkout-api'));
+app.use('/api', require('./routes/shop'));
 app.use('/admin', (req, res, next) => {
   res.locals.noIndex = true; // never let search engines index the admin panel
   next();
