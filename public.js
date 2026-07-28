@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { BULK_MIN_QTY, resolveOrder } = require('../lib/pricing');
+const { sendContactNotification } = require('../lib/mailer');
 
 let stripe = null;
 if (process.env.STRIPE_SECRET_KEY) {
@@ -111,6 +112,7 @@ router.post('/contact', (req, res) => {
   db.prepare('INSERT INTO messages (name, email, message) VALUES (?, ?, ?)').run(
     name.trim(), email.trim(), message.trim()
   );
+  sendContactNotification({ name: name.trim(), email: email.trim(), message: message.trim() });
   res.redirect('/contact?sent=1');
 });
 
