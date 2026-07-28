@@ -41,6 +41,7 @@ async function sendContactNotification({ name, email, message }) {
         <p style="color:#888; font-size: 0.85em;">Reply directly to this email to respond to ${name}.</p>
       `
     });
+    console.log(`Contact notification email sent successfully to ${toAddress}.`);
   } catch (err) {
     console.error('Failed to send contact notification email:', err.message);
   }
