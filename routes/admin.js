@@ -57,10 +57,24 @@ function getArtworksWithCategories() {
   return artworks.map(a => ({ ...a, categories: catStmt.all(a.id) }));
 }
 
+function getAllPillPosition() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'all_pill_position'").get();
+  return row ? parseInt(row.value, 10) : 0;
+}
+
+function buildPillOrder(categories, allPosition) {
+  const merged = categories.map(c => ({ isAll: false, id: c.id, name: c.name, slug: c.slug }));
+  const clamped = Math.max(0, Math.min(allPosition, merged.length));
+  merged.splice(clamped, 0, { isAll: true, id: 'all', name: 'All' });
+  return merged;
+}
+
 function dashboardData() {
+  const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
   return {
     artworks: getArtworksWithCategories(),
-    categories: db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all(),
+    categories,
+    pillOrder: buildPillOrder(categories, getAllPillPosition()),
     messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all(),
     posts: db.prepare('SELECT * FROM posts ORDER BY published_at DESC').all()
   };
@@ -127,6 +141,30 @@ router.post('/categories/:id/delete', requireAdmin, (req, res) => {
   res.redirect('/admin');
 });
 
+// Reorder categories AND the "All" pill together.
+// Expects { orderedItems: ["all", "3", "1", "2", ...] } — position in the
+// array is the display order; "all" can appear anywhere in that list.
+router.post('/categories/reorder', requireAdmin, (req, res) => {
+  const { orderedItems } = req.body;
+  if (!Array.isArray(orderedItems)) return res.status(400).json({ error: 'Invalid payload.' });
+
+  const allIndex = orderedItems.findIndex(item => item === 'all');
+  const categoryIds = orderedItems.filter(item => item !== 'all').map(id => parseInt(id, 10));
+
+  const update = db.prepare('UPDATE categories SET position = ? WHERE id = ?');
+  const tx = db.transaction((ids) => {
+    ids.forEach((id, index) => update.run(index, id));
+  });
+  tx(categoryIds);
+
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES ('all_pill_position', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(String(allIndex === -1 ? 0 : allIndex));
+
+  res.json({ ok: true });
+});
+
 // ---------- Artworks ----------
 
 function titleFromFilename(filename) {
@@ -141,6 +179,7 @@ function titleFromFilename(filename) {
 router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
   const { title, description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
+  const shipsAsCanvas = req.body.ships_as_canvas ? 1 : 0;
 
   if (!title || !req.file) {
     return res.render('admin/dashboard', {
@@ -152,14 +191,15 @@ router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
   const position = (maxPos === null ? 0 : maxPos + 1);
 
   const result = db.prepare(`
-    INSERT INTO artworks (title, description, image_path, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO artworks (title, description, image_path, dimensions, material, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     title.trim(),
     (description || '').trim(),
     `/uploads/${req.file.filename}`,
     (dimensions || '').trim() || '8.5" x 11"',
     (material || '').trim(),
+    shipsAsCanvas,
     parseFloat(price_retail) || 45.00,
     parseFloat(price_bulk_packaging) || 30.00,
     parseFloat(price_bulk_no_packaging) || 25.00,
@@ -174,6 +214,7 @@ router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
 router.post('/artworks/bulk', requireAdmin, upload.array('images', 60), (req, res) => {
   const { description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
+  const shipsAsCanvas = req.body.ships_as_canvas ? 1 : 0;
 
   if (!req.files || req.files.length === 0) {
     return res.render('admin/dashboard', {
@@ -185,8 +226,8 @@ router.post('/artworks/bulk', requireAdmin, upload.array('images', 60), (req, re
   let position = (maxPos === null ? 0 : maxPos + 1);
 
   const insert = db.prepare(`
-    INSERT INTO artworks (title, description, image_path, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO artworks (title, description, image_path, dimensions, material, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   req.files.forEach(file => {
@@ -196,6 +237,7 @@ router.post('/artworks/bulk', requireAdmin, upload.array('images', 60), (req, re
       `/uploads/${file.filename}`,
       (dimensions || '').trim() || '8.5" x 11"',
       (material || '').trim(),
+      shipsAsCanvas,
       parseFloat(price_retail) || 45.00,
       parseFloat(price_bulk_packaging) || 30.00,
       parseFloat(price_bulk_no_packaging) || 25.00,
@@ -241,6 +283,7 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
 
   const { title, description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
+  const shipsAsCanvas = req.body.ships_as_canvas ? 1 : 0;
 
   if (!title || !title.trim()) {
     const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
@@ -259,7 +302,7 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
 
   db.prepare(`
     UPDATE artworks
-    SET title = ?, description = ?, image_path = ?, dimensions = ?, material = ?,
+    SET title = ?, description = ?, image_path = ?, dimensions = ?, material = ?, ships_as_canvas = ?,
         price_retail = ?, price_bulk_packaging = ?, price_bulk_no_packaging = ?
     WHERE id = ?
   `).run(
@@ -268,6 +311,7 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
     imagePath,
     (dimensions || '').trim() || '8.5" x 11"',
     (material || '').trim(),
+    shipsAsCanvas,
     parseFloat(price_retail) || 45.00,
     parseFloat(price_bulk_packaging) || 30.00,
     parseFloat(price_bulk_no_packaging) || 25.00,

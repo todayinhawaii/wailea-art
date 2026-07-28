@@ -38,6 +38,11 @@
             <input type="text" id="material" name="material" placeholder="e.g. Giclée print on fine art paper">
           </div>
           <div class="field-group">
+            <label class="checkbox-pill" style="width: fit-content;">
+              <input type="checkbox" name="ships_as_canvas" value="1">
+              <span>This ships as a rolled canvas (in a tube)</span>
+            </label>
+          <div class="field-group">
             <label for="image">Image (JPG, PNG, or WEBP)</label>
             <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp" required>
           </div>
@@ -101,6 +106,11 @@
             <label for="bulk_material">Material (optional, applied to all)</label>
             <input type="text" id="bulk_material" name="material" placeholder="e.g. Giclée print on fine art paper">
           </div>
+          <div class="field-group">
+            <label class="checkbox-pill" style="width: fit-content;">
+              <input type="checkbox" name="ships_as_canvas" value="1">
+              <span>These all ship as rolled canvases (in a tube)</span>
+            </label>
 
           <div class="field-group">
             <label for="bulk_description">Description (optional, applied to all)</label>
@@ -145,24 +155,29 @@
 
       <div class="admin-card">
         <h3>Categories</h3>
-        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">These show as pills at the top of your homepage.</p>
+        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">These show as pills at the top of your homepage. Drag to set the order — including where "All" appears.</p>
 
-        <% if (categories.length === 0) { %>
-          <p style="color: var(--ink-soft); font-size: 0.9rem;">No categories yet — add your first one below.</p>
-        <% } else { %>
-          <div class="category-manage-list">
-            <% categories.forEach(function(cat) { %>
-              <div class="category-manage-item">
-                <span><%= cat.name %></span>
-                <form method="POST" action="/admin/categories/<%= cat.id %>/delete" onsubmit="return confirm('Delete this category? It will be removed from any art using it.');">
-                  <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
-                </form>
-              </div>
-            <% }); %>
-          </div>
-        <% } %>
+        <ul class="sortable-list" id="categorySortableList">
+          <% pillOrder.forEach(function(item) { %>
+            <li class="sortable-item" draggable="true" data-id="<%= item.id %>">
+              <span class="drag-handle">&#8942;&#8942;</span>
+              <span class="item-title"><%= item.isAll ? 'All' : item.name %><% if (item.isAll) { %> <span style="color:var(--ink-soft); font-size:0.78rem;">(shows every piece)</span><% } %></span>
+              <% if (!item.isAll) { %>
+                <div class="item-actions">
+                  <form method="POST" action="/admin/categories/<%= item.id %>/delete" onsubmit="return confirm('Delete this category? It will be removed from any art using it.');">
+                    <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                  </form>
+                </div>
+              <% } %>
+            </li>
+          <% }); %>
+        </ul>
+        <div style="display:flex; align-items:center; gap:14px; margin-top:14px;">
+          <button class="btn btn-primary" type="button" id="saveCategoryOrderBtn">Save order</button>
+          <span id="categoryOrderSaveStatus" style="font-size:0.85rem; opacity:0; transition:opacity 0.3s ease;"></span>
+        </div>
 
-        <form method="POST" action="/admin/categories" class="stack" style="margin-top:16px;">
+        <form method="POST" action="/admin/categories" class="stack" style="margin-top:20px;">
           <div class="field-group" style="display:flex; gap:10px; margin:0; align-items:flex-end;">
             <div style="flex:1;">
               <label for="cat_name">New category name</label>

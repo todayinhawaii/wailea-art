@@ -34,6 +34,11 @@
         <input type="text" id="material" name="material" value="<%= artwork.material %>" placeholder="e.g. Giclée print on fine art paper">
       </div>
       <div class="field-group">
+        <label class="checkbox-pill" style="width: fit-content;">
+          <input type="checkbox" name="ships_as_canvas" value="1" <%= artwork.ships_as_canvas ? 'checked' : '' %>>
+          <span>This ships as a rolled canvas (in a tube)</span>
+        </label>
+      <div class="field-group">
         <label for="image">Replace image (optional — leave blank to keep current image)</label>
         <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp">
       </div>

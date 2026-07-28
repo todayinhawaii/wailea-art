@@ -127,6 +127,12 @@ router.get('/', (req, res) => {
   const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
   const activeSlug = req.query.category || null;
 
+  const allPositionRow = db.prepare("SELECT value FROM settings WHERE key = 'all_pill_position'").get();
+  const allPosition = allPositionRow ? parseInt(allPositionRow.value, 10) : 0;
+  const pillOrder = categories.map(c => ({ isAll: false, slug: c.slug, name: c.name }));
+  const clampedAllPos = Math.max(0, Math.min(allPosition, pillOrder.length));
+  pillOrder.splice(clampedAllPos, 0, { isAll: true, slug: null, name: 'All' });
+
   let artworks;
   if (activeSlug) {
     artworks = db.prepare(`
@@ -140,7 +146,7 @@ router.get('/', (req, res) => {
     artworks = db.prepare('SELECT * FROM artworks ORDER BY position ASC').all();
   }
 
-  res.render('index', { artworks, categories, activeSlug, bulkMinQty: BULK_MIN_QTY, page: 'home' });
+  res.render('index', { artworks, categories, pillOrder, activeSlug, bulkMinQty: BULK_MIN_QTY, page: 'home' });
 });
 
 router.get('/about', (req, res) => {
