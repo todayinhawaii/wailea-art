@@ -1,4 +1,31 @@
 (function () {
+  // ---------- Gallery card carousels ----------
+  document.querySelectorAll('.card-img[data-multi]').forEach(carousel => {
+    const slides = [...carousel.querySelectorAll('.carousel-slide')];
+    const dots = [...carousel.querySelectorAll('.carousel-dot')];
+    let current = 0;
+
+    function show(index) {
+      current = (index + slides.length) % slides.length;
+      slides.forEach((slide, i) => slide.classList.toggle('active', i === current));
+      dots.forEach((dot, i) => dot.classList.toggle('active', i === current));
+    }
+
+    const prevBtn = carousel.querySelector('.carousel-arrow-prev');
+    const nextBtn = carousel.querySelector('.carousel-arrow-next');
+
+    if (prevBtn) prevBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); show(current - 1); });
+    if (nextBtn) nextBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); show(current + 1); });
+
+    dots.forEach(dot => {
+      dot.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        show(parseInt(dot.dataset.index, 10));
+      });
+    });
+  });
+
   const BULK_MIN_QTY = 10;
 
   const modal = document.getElementById('buyModal');

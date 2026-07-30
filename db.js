@@ -24,6 +24,14 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS artwork_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    artwork_id INTEGER NOT NULL REFERENCES artworks(id) ON DELETE CASCADE,
+    image_path TEXT NOT NULL,
+    position REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

@@ -146,6 +146,12 @@ router.get('/', (req, res) => {
     artworks = db.prepare('SELECT * FROM artworks ORDER BY position ASC').all();
   }
 
+  const extraImagesStmt = db.prepare('SELECT image_path FROM artwork_images WHERE artwork_id = ? ORDER BY position ASC');
+  artworks = artworks.map(a => ({
+    ...a,
+    images: [a.image_path, ...extraImagesStmt.all(a.id).map(r => r.image_path)]
+  }));
+
   res.render('index', { artworks, categories, pillOrder, activeSlug, bulkMinQty: BULK_MIN_QTY, page: 'home' });
 });
 

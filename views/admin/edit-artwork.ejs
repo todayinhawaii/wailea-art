@@ -38,8 +38,9 @@
           <input type="checkbox" name="ships_as_canvas" value="1" <%= artwork.ships_as_canvas ? 'checked' : '' %>>
           <span>This ships as a rolled canvas (in a tube)</span>
         </label>
+      </div>
       <div class="field-group">
-        <label for="image">Replace image (optional — leave blank to keep current image)</label>
+        <label for="image">Replace main image (optional — leave blank to keep current image)</label>
         <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp">
       </div>
 
@@ -76,6 +77,38 @@
       </div>
 
       <button class="btn btn-primary btn-block" type="submit">Save changes</button>
+    </form>
+  </div>
+
+  <div class="admin-card" style="max-width: 560px;">
+    <h3>Carousel images</h3>
+    <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">Add more photos of this same piece — once there's more than one image, the gallery card will show left/right arrows so shoppers can browse them.</p>
+
+    <% if (extraImages.length === 0) { %>
+      <p style="color: var(--ink-soft); font-size: 0.9rem;">Just the one main image right now — add more below to turn this into a carousel.</p>
+    <% } else { %>
+      <div class="carousel-thumb-grid">
+        <div class="carousel-thumb">
+          <img src="<%= artwork.image_path %>" alt="Main image">
+          <span class="carousel-thumb-label">Main</span>
+        </div>
+        <% extraImages.forEach(function(img) { %>
+          <div class="carousel-thumb">
+            <img src="<%= img.image_path %>" alt="Additional image">
+            <form method="POST" action="/admin/artworks/<%= artwork.id %>/images/<%= img.id %>/delete" onsubmit="return confirm('Remove this image from the carousel?');">
+              <button class="btn btn-sm carousel-thumb-delete" style="background:var(--danger); color:#fff;" type="submit">&times;</button>
+            </form>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+
+    <form method="POST" action="/admin/artworks/<%= artwork.id %>/images" enctype="multipart/form-data" class="stack" style="margin-top:16px;">
+      <div class="field-group">
+        <label for="extra_images">Add image(s)</label>
+        <input type="file" id="extra_images" name="extra_images" accept="image/jpeg,image/png,image/webp" multiple>
+      </div>
+      <button class="btn btn-secondary btn-block" type="submit">Add to carousel</button>
     </form>
   </div>
 </main>

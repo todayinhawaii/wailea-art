@@ -257,8 +257,10 @@ router.get('/artworks/:id/edit', requireAdmin, (req, res) => {
   const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
   const selectedIds = db.prepare('SELECT category_id FROM artwork_categories WHERE artwork_id = ?')
     .all(artwork.id).map(r => r.category_id);
+  const extraImages = db.prepare('SELECT * FROM artwork_images WHERE artwork_id = ? ORDER BY position ASC')
+    .all(artwork.id);
 
-  res.render('admin/edit-artwork', { artwork, categories, selectedIds, error: null, page: 'admin' });
+  res.render('admin/edit-artwork', { artwork, categories, selectedIds, extraImages, error: null, page: 'admin' });
 });
 
 // Reorder: expects { orderedIds: [3, 1, 2, ...] } lowest index = top of gallery
@@ -287,8 +289,9 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
 
   if (!title || !title.trim()) {
     const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
+    const extraImages = db.prepare('SELECT * FROM artwork_images WHERE artwork_id = ? ORDER BY position ASC').all(artwork.id);
     return res.render('admin/edit-artwork', {
-      artwork, categories, selectedIds: categoryIds, error: 'Title is required.', page: 'admin'
+      artwork, categories, selectedIds: categoryIds, extraImages, error: 'Title is required.', page: 'admin'
     });
   }
 
@@ -324,8 +327,44 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
 });
 
 router.post('/artworks/:id/delete', requireAdmin, (req, res) => {
+  const extraImages = db.prepare('SELECT * FROM artwork_images WHERE artwork_id = ?').all(req.params.id);
+  extraImages.forEach(img => {
+    const filePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(img.image_path));
+    fs.unlink(filePath, () => {});
+  });
+  db.prepare('DELETE FROM artwork_images WHERE artwork_id = ?').run(req.params.id);
   db.prepare('DELETE FROM artworks WHERE id = ?').run(req.params.id);
   res.redirect('/admin');
+});
+
+// ---------- Carousel images (additional photos per artwork) ----------
+
+router.post('/artworks/:id/images', requireAdmin, upload.array('extra_images', 10), (req, res) => {
+  const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
+  if (!artwork) return res.redirect('/admin');
+
+  if (req.files && req.files.length) {
+    const maxPos = db.prepare('SELECT MAX(position) AS m FROM artwork_images WHERE artwork_id = ?').get(artwork.id).m;
+    let position = (maxPos === null ? 0 : maxPos + 1);
+    const insert = db.prepare('INSERT INTO artwork_images (artwork_id, image_path, position) VALUES (?, ?, ?)');
+    req.files.forEach(file => {
+      insert.run(artwork.id, `/uploads/${file.filename}`, position);
+      position++;
+    });
+  }
+
+  res.redirect(`/admin/artworks/${artwork.id}/edit`);
+});
+
+router.post('/artworks/:id/images/:imageId/delete', requireAdmin, (req, res) => {
+  const image = db.prepare('SELECT * FROM artwork_images WHERE id = ? AND artwork_id = ?')
+    .get(req.params.imageId, req.params.id);
+  if (image) {
+    const filePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(image.image_path));
+    fs.unlink(filePath, () => {});
+    db.prepare('DELETE FROM artwork_images WHERE id = ?').run(image.id);
+  }
+  res.redirect(`/admin/artworks/${req.params.id}/edit`);
 });
 
 // Move single item to very top or very bottom (used by "send to top/bottom" buttons)
