@@ -529,8 +529,8 @@ router.post('/regenerate-previews', requireAdmin, async (req, res) => {
   // slow for some images and too conservative for others. Stopping based on
   // elapsed time instead keeps every single request safely short, no matter
   // how large or slow any particular photo turns out to be.
-  const MAX_BATCH_TIME_MS = 6000; // 6 seconds — very conservative
-  const MAX_IMAGES_PER_REQUEST = 1; // one at a time — confirmed necessary: a single real JPEG photo can take several seconds by itself
+  const MAX_BATCH_TIME_MS = 10000; // 10 seconds
+  const MAX_IMAGES_PER_REQUEST = 15; // sharp is fast/light enough to safely handle more per click
   const startTime = Date.now();
   const timeIsUp = () => Date.now() - startTime > MAX_BATCH_TIME_MS;
 
