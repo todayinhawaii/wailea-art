@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
-const upload = require('../lib/upload');
+const { upload, withUploadErrorHandling } = require('../lib/upload');
 const requireAdmin = require('../lib/requireAdmin');
 const slugify = require('../lib/slugify');
 const excerptFromHtml = require('../lib/excerpt');
@@ -101,7 +101,10 @@ function normalizeCategoryIds(raw) {
 router.get('/', requireAdmin, (req, res) => {
   const bulkAdded = parseInt(req.query.bulkAdded, 10);
   const success = bulkAdded ? `Added ${bulkAdded} piece${bulkAdded === 1 ? '' : 's'} to your gallery. Click "Edit" on each to add a title, description, or categories.` : null;
-  res.render('admin/dashboard', { ...dashboardData(), error: null, success, page: 'admin' });
+
+  const uploadError = req.query.uploadError ? decodeURIComponent(req.query.uploadError) : null;
+
+  res.render('admin/dashboard', { ...dashboardData(), error: uploadError, success, page: 'admin' });
 });
 
 // ---------- Categories ----------
@@ -177,7 +180,7 @@ function titleFromFilename(filename) {
     .join(' ') || 'Untitled';
 }
 
-router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
+router.post('/artworks', requireAdmin, withUploadErrorHandling(upload.single('image')), (req, res) => {
   const { title, description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
   const shipsAsCanvas = req.body.ships_as_canvas ? 1 : 0;
@@ -214,7 +217,7 @@ router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
   res.redirect('/admin');
 });
 
-router.post('/artworks/bulk', requireAdmin, upload.array('images', 60), (req, res) => {
+router.post('/artworks/bulk', requireAdmin, withUploadErrorHandling(upload.array('images', 60)), (req, res) => {
   const { description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
   const shipsAsCanvas = req.body.ships_as_canvas ? 1 : 0;
@@ -314,7 +317,7 @@ router.post('/artworks/bulk-delete', requireAdmin, (req, res) => {
   res.json({ ok: true, deleted: validIds.length });
 });
 
-router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) => {
+router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single('image')), (req, res) => {
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   if (!artwork) return res.redirect('/admin');
 
@@ -383,7 +386,7 @@ router.post('/artworks/:id/delete', requireAdmin, (req, res) => {
 
 // ---------- Carousel images (additional photos per artwork) ----------
 
-router.post('/artworks/:id/images', requireAdmin, upload.array('extra_images', 10), (req, res) => {
+router.post('/artworks/:id/images', requireAdmin, withUploadErrorHandling(upload.array('extra_images', 10)), (req, res) => {
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   if (!artwork) return res.redirect('/admin');
 
@@ -450,7 +453,7 @@ router.get('/posts/new', requireAdmin, (req, res) => {
   res.render('admin/post-form', { post: null, error: null, page: 'admin' });
 });
 
-router.post('/posts', requireAdmin, upload.single('featured_image'), (req, res) => {
+router.post('/posts', requireAdmin, withUploadErrorHandling(upload.single('featured_image')), (req, res) => {
   const { title, excerpt, content } = req.body;
 
   if (!title || !title.trim() || !req.file) {
@@ -482,7 +485,7 @@ router.get('/posts/:id/edit', requireAdmin, (req, res) => {
   res.render('admin/post-form', { post, error: null, page: 'admin' });
 });
 
-router.post('/posts/:id', requireAdmin, upload.single('featured_image'), (req, res) => {
+router.post('/posts/:id', requireAdmin, withUploadErrorHandling(upload.single('featured_image')), (req, res) => {
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
   if (!post) return res.redirect('/admin');
 

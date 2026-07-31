@@ -59,6 +59,20 @@ app.use((req, res) => {
   res.status(404).render('404', { page: '404' });
 });
 
+// Safety net for any other unexpected error that slips through (upload
+// errors are now caught right at the route level in lib/upload.js, since
+// Multer's own error behavior doesn't always reach this global handler).
+app.use((err, req, res, next) => {
+  console.error('Request error:', err);
+  const isAdmin = req.path.startsWith('/admin');
+  const message = (err && err.message) || 'Something went wrong. Please try again.';
+
+  if (isAdmin) {
+    return res.redirect('/admin?uploadError=' + encodeURIComponent(message));
+  }
+  res.status(500).send(message);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Wailea Art running on port ${PORT}`);
