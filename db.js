@@ -14,6 +14,7 @@ db.exec(`
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     image_path TEXT NOT NULL,
+    original_path TEXT,
     dimensions TEXT NOT NULL DEFAULT '8.5" x 11"',
     material TEXT NOT NULL DEFAULT '',
     orientation TEXT NOT NULL DEFAULT 'portrait',
@@ -29,6 +30,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     artwork_id INTEGER NOT NULL REFERENCES artworks(id) ON DELETE CASCADE,
     image_path TEXT NOT NULL,
+    original_path TEXT,
     position REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -84,6 +86,14 @@ if (!artworkCols.includes('ships_as_canvas')) {
 }
 if (!artworkCols.includes('orientation')) {
   db.exec(`ALTER TABLE artworks ADD COLUMN orientation TEXT NOT NULL DEFAULT 'portrait'`);
+}
+if (!artworkCols.includes('original_path')) {
+  db.exec(`ALTER TABLE artworks ADD COLUMN original_path TEXT`);
+}
+
+const artworkImageCols = db.prepare("PRAGMA table_info(artwork_images)").all().map(c => c.name);
+if (artworkImageCols.length && !artworkImageCols.includes('original_path')) {
+  db.exec(`ALTER TABLE artwork_images ADD COLUMN original_path TEXT`);
 }
 
 module.exports = db;

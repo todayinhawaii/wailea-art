@@ -99,20 +99,35 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   border-bottom-color: var(--clay);
 }
 
-/* ---------- intro ---------- */
+/* ---------- hero band ---------- */
+.hero-band {
+  background: #2b2c2e;
+  padding: 10px 0;
+}
 .intro {
-  padding: 48px 0 20px;
+  padding: 44px 0 48px;
   max-width: 620px;
   margin: 0 auto;
   text-align: center;
 }
+.hero-logo {
+  max-width: 280px;
+  width: 100%;
+  height: auto;
+  margin: 0 auto 18px;
+  display: block;
+}
+.intro h1 {
+  font-size: 2.1rem;
+  margin-bottom: 0.3em;
+  color: #f7f4ee;
+}
 .intro p {
-  color: var(--ink-soft);
+  color: #b9b8b6;
   font-size: 1.05rem;
   margin: 0;
 }
 .intro p + p { margin-top: 0.9em; }
-.intro h1 { font-size: 2.1rem; margin-bottom: 0.3em; }
 
 /* ---------- category pills ---------- */
 .category-pills {
@@ -189,6 +204,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.35s ease;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .carousel-slide.active {
   opacity: 1;
@@ -266,6 +284,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   object-fit: contain;
   border-radius: 4px;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .lightbox-close {
   position: fixed;
@@ -706,3 +727,20 @@ form.stack .field-group { margin: 0 0 16px; }
   align-items: center;
   justify-content: center;
 }
+.carousel-thumb-download {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ocean);
+  color: #fff;
+  font-size: 0.85rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.carousel-thumb-download:hover { background: var(--ocean-dark); color: #fff; }

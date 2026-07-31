@@ -14,6 +14,9 @@
   <div class="admin-card" style="max-width: 560px;">
     <div style="margin-bottom: 18px;">
       <img src="<%= artwork.image_path %>" alt="<%= artwork.title %>" style="max-width: 160px; border-radius: 3px; border: 1px solid var(--sand-line);">
+      <div style="margin-top: 8px;">
+        <a class="btn btn-secondary btn-sm" href="/admin/artworks/<%= artwork.id %>/original">Download original (full resolution)</a>
+      </div>
     </div>
 
     <form method="POST" action="/admin/artworks/<%= artwork.id %>" enctype="multipart/form-data" class="stack">
@@ -95,6 +98,7 @@
         <% extraImages.forEach(function(img) { %>
           <div class="carousel-thumb">
             <img src="<%= img.image_path %>" alt="Additional image">
+            <a href="/admin/artworks/<%= artwork.id %>/images/<%= img.id %>/original" class="carousel-thumb-download" title="Download original">&#8681;</a>
             <form method="POST" action="/admin/artworks/<%= artwork.id %>/images/<%= img.id %>/delete" onsubmit="return confirm('Remove this image from the carousel?');">
               <button class="btn btn-sm carousel-thumb-delete" style="background:var(--danger); color:#fff;" type="submit">&times;</button>
             </form>

@@ -4,13 +4,18 @@
 <% if (artworks.length > 0) { ogImage = artworks[0].image_path } %>
 <%- include('partials/header') %>
 
-<main class="wrap">
-  <div class="intro">
-    <h1>Original Hawaii art prints, made to live on your wall.</h1>
-    <p>Every piece is printed and shipped from Wailea, Maui — art inspired by the islands of Hawaii, from Kapalua and Lahaina to Oahu, Honolulu, and beyond. Order a single print, or ask about bulk pricing for ten or more of the same piece.</p>
-    <p>We carefully package every order and ship to all islands of Hawaii, and around the world.</p>
+<section class="hero-band">
+  <div class="wrap">
+    <div class="intro">
+      <img src="/images/wailea-art-logo.png" alt="Wailea Art" class="hero-logo">
+      <h1>Original Hawaii art prints, made to live on your wall.</h1>
+      <p>Every piece is printed and shipped from Wailea, Maui — art inspired by the islands of Hawaii, from Kapalua and Lahaina to Oahu, Honolulu, and beyond. Order a single print, or ask about bulk pricing for ten or more of the same piece.</p>
+      <p>We carefully package every order and ship to all islands of Hawaii, and around the world.</p>
+    </div>
   </div>
+</section>
 
+<main class="wrap">
   <% if (categories.length > 0) { %>
     <div class="category-pills">
       <% pillOrder.forEach(function(item) { %>
@@ -33,7 +38,7 @@
         <div class="card">
           <div class="card-img orientation-<%= art.orientation || 'portrait' %>" data-carousel<% if (art.images.length > 1) { %> data-multi<% } %>>
             <% art.images.forEach(function(imgPath, i) { %>
-              <img src="<%= imgPath %>" alt="<%= art.title %> - Original Hawaii Art Print by Wailea Art" loading="lazy" class="carousel-slide <%= i === 0 ? 'active' : '' %>" data-index="<%= i %>">
+              <img src="<%= imgPath %>" alt="<%= art.title %> - Original Hawaii Art Print by Wailea Art" loading="lazy" class="carousel-slide <%= i === 0 ? 'active' : '' %>" data-index="<%= i %>" draggable="false" oncontextmenu="return false;">
             <% }); %>
             <% if (art.images.length > 1) { %>
               <button type="button" class="carousel-arrow carousel-arrow-prev" aria-label="Previous image">
@@ -111,7 +116,7 @@
   <button type="button" class="lightbox-arrow lightbox-arrow-prev" id="lightboxPrev" aria-label="Previous image">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
   </button>
-  <img id="lightboxImage" src="" alt="">
+  <img id="lightboxImage" src="" alt="" draggable="false" oncontextmenu="return false;">
   <button type="button" class="lightbox-arrow lightbox-arrow-next" id="lightboxNext" aria-label="Next image">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
   </button>

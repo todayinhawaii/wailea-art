@@ -16,6 +16,20 @@
     <div class="alert alert-success"><%= success %></div>
   <% } %>
 
+  <% if (typeof unprotectedCount !== 'undefined' && unprotectedCount > 0) { %>
+    <div class="admin-card" style="background: #fdf6e3; border-color: #e8d9a8; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+      <div>
+        <strong>Image protection</strong>
+        <p style="margin: 4px 0 0; font-size: 0.88rem; color: var(--ink-soft);">
+          <%= unprotectedCount %> image<%= unprotectedCount === 1 ? '' : 's' %> from before this feature existed are still showing full resolution publicly. One click makes them safe too.
+        </p>
+      </div>
+      <form method="POST" action="/admin/regenerate-previews" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Protecting…';">
+        <button class="btn btn-primary btn-sm" type="submit">Protect existing art</button>
+      </form>
+    </div>
+  <% } %>
+
   <div class="admin-grid">
     <div>
       <div class="admin-card">

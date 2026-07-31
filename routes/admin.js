@@ -9,6 +9,7 @@ const requireAdmin = require('../lib/requireAdmin');
 const slugify = require('../lib/slugify');
 const excerptFromHtml = require('../lib/excerpt');
 const detectOrientation = require('../lib/detectOrientation');
+const { splitUploadedFile, createPreview, originalsDir } = require('../lib/imagePreview');
 
 // ---------- Login ----------
 
@@ -72,12 +73,15 @@ function buildPillOrder(categories, allPosition) {
 
 function dashboardData() {
   const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
+  const unprotectedCount = db.prepare('SELECT COUNT(*) AS c FROM artworks WHERE original_path IS NULL').get().c
+    + db.prepare('SELECT COUNT(*) AS c FROM artwork_images WHERE original_path IS NULL').get().c;
   return {
     artworks: getArtworksWithCategories(),
     categories,
     pillOrder: buildPillOrder(categories, getAllPillPosition()),
     messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all(),
-    posts: db.prepare('SELECT * FROM posts ORDER BY published_at DESC').all()
+    posts: db.prepare('SELECT * FROM posts ORDER BY published_at DESC').all(),
+    unprotectedCount
   };
 }
 
@@ -100,7 +104,15 @@ function normalizeCategoryIds(raw) {
 
 router.get('/', requireAdmin, (req, res) => {
   const bulkAdded = parseInt(req.query.bulkAdded, 10);
-  const success = bulkAdded ? `Added ${bulkAdded} piece${bulkAdded === 1 ? '' : 's'} to your gallery. Click "Edit" on each to add a title, description, or categories.` : null;
+  const migrated = parseInt(req.query.migrated, 10);
+  let success = null;
+  if (bulkAdded) {
+    success = `Added ${bulkAdded} piece${bulkAdded === 1 ? '' : 's'} to your gallery. Click "Edit" on each to add a title, description, or categories.`;
+  } else if (!isNaN(migrated)) {
+    success = migrated > 0
+      ? `Protected ${migrated} existing image${migrated === 1 ? '' : 's'} — full-resolution originals are now private.`
+      : 'Everything is already protected — no unprotected images found.';
+  }
 
   const uploadError = req.query.uploadError ? decodeURIComponent(req.query.uploadError) : null;
 
@@ -180,7 +192,7 @@ function titleFromFilename(filename) {
     .join(' ') || 'Untitled';
 }
 
-router.post('/artworks', requireAdmin, withUploadErrorHandling(upload.single('image')), (req, res) => {
+router.post('/artworks', requireAdmin, withUploadErrorHandling(upload.single('image')), async (req, res) => {
   const { title, description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
   const shipsAsCanvas = req.body.ships_as_canvas ? 1 : 0;
@@ -191,33 +203,40 @@ router.post('/artworks', requireAdmin, withUploadErrorHandling(upload.single('im
     });
   }
 
-  const maxPos = db.prepare('SELECT MAX(position) AS m FROM artworks').get().m;
-  const position = (maxPos === null ? 0 : maxPos + 1);
-  const orientation = detectOrientation(req.file.path);
+  try {
+    const maxPos = db.prepare('SELECT MAX(position) AS m FROM artworks').get().m;
+    const position = (maxPos === null ? 0 : maxPos + 1);
+    const orientation = detectOrientation(req.file.path);
+    const { imagePath, originalFilename } = await splitUploadedFile(req.file);
 
-  const result = db.prepare(`
-    INSERT INTO artworks (title, description, image_path, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    title.trim(),
-    (description || '').trim(),
-    `/uploads/${req.file.filename}`,
-    (dimensions || '').trim() || '8.5" x 11"',
-    (material || '').trim(),
-    orientation,
-    shipsAsCanvas,
-    parseFloat(price_retail) || 45.00,
-    parseFloat(price_bulk_packaging) || 30.00,
-    parseFloat(price_bulk_no_packaging) || 25.00,
-    position
-  );
+    const result = db.prepare(`
+      INSERT INTO artworks (title, description, image_path, original_path, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      title.trim(),
+      (description || '').trim(),
+      imagePath,
+      originalFilename,
+      (dimensions || '').trim() || '8.5" x 11"',
+      (material || '').trim(),
+      orientation,
+      shipsAsCanvas,
+      parseFloat(price_retail) || 45.00,
+      parseFloat(price_bulk_packaging) || 30.00,
+      parseFloat(price_bulk_no_packaging) || 25.00,
+      position
+    );
 
-  if (categoryIds.length) setArtworkCategories(result.lastInsertRowid, categoryIds);
+    if (categoryIds.length) setArtworkCategories(result.lastInsertRowid, categoryIds);
 
-  res.redirect('/admin');
+    res.redirect('/admin');
+  } catch (err) {
+    console.error('Error processing uploaded image:', err);
+    res.redirect('/admin?uploadError=' + encodeURIComponent('Could not process that image. Please try a different file.'));
+  }
 });
 
-router.post('/artworks/bulk', requireAdmin, withUploadErrorHandling(upload.array('images', 60)), (req, res) => {
+router.post('/artworks/bulk', requireAdmin, withUploadErrorHandling(upload.array('images', 60)), async (req, res) => {
   const { description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
   const shipsAsCanvas = req.body.ships_as_canvas ? 1 : 0;
@@ -228,34 +247,42 @@ router.post('/artworks/bulk', requireAdmin, withUploadErrorHandling(upload.array
     });
   }
 
-  const maxPos = db.prepare('SELECT MAX(position) AS m FROM artworks').get().m;
-  let position = (maxPos === null ? 0 : maxPos + 1);
+  try {
+    const maxPos = db.prepare('SELECT MAX(position) AS m FROM artworks').get().m;
+    let position = (maxPos === null ? 0 : maxPos + 1);
 
-  const insert = db.prepare(`
-    INSERT INTO artworks (title, description, image_path, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+    const insert = db.prepare(`
+      INSERT INTO artworks (title, description, image_path, original_path, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-  req.files.forEach(file => {
-    const orientation = detectOrientation(file.path);
-    const result = insert.run(
-      titleFromFilename(file.originalname),
-      (description || '').trim(),
-      `/uploads/${file.filename}`,
-      (dimensions || '').trim() || '8.5" x 11"',
-      (material || '').trim(),
-      orientation,
-      shipsAsCanvas,
-      parseFloat(price_retail) || 45.00,
-      parseFloat(price_bulk_packaging) || 30.00,
-      parseFloat(price_bulk_no_packaging) || 25.00,
-      position
-    );
-    position++;
-    if (categoryIds.length) setArtworkCategories(result.lastInsertRowid, categoryIds);
-  });
+    for (const file of req.files) {
+      const orientation = detectOrientation(file.path);
+      const { imagePath, originalFilename } = await splitUploadedFile(file);
 
-  res.redirect(`/admin?bulkAdded=${req.files.length}`);
+      const result = insert.run(
+        titleFromFilename(file.originalname),
+        (description || '').trim(),
+        imagePath,
+        originalFilename,
+        (dimensions || '').trim() || '8.5" x 11"',
+        (material || '').trim(),
+        orientation,
+        shipsAsCanvas,
+        parseFloat(price_retail) || 45.00,
+        parseFloat(price_bulk_packaging) || 30.00,
+        parseFloat(price_bulk_no_packaging) || 25.00,
+        position
+      );
+      position++;
+      if (categoryIds.length) setArtworkCategories(result.lastInsertRowid, categoryIds);
+    }
+
+    res.redirect(`/admin?bulkAdded=${req.files.length}`);
+  } catch (err) {
+    console.error('Error processing bulk upload:', err);
+    res.redirect('/admin?uploadError=' + encodeURIComponent('Something went wrong processing those images. Please try again.'));
+  }
 });
 
 router.get('/artworks/:id/edit', requireAdmin, (req, res) => {
@@ -299,12 +326,18 @@ router.post('/artworks/bulk-delete', requireAdmin, (req, res) => {
     extraImages.forEach(img => {
       const filePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(img.image_path));
       fs.unlink(filePath, () => {});
+      if (img.original_path) {
+        fs.unlink(path.join(originalsDir, path.basename(img.original_path)), () => {});
+      }
     });
 
     const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(artworkId);
     if (artwork) {
       const mainFilePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
       fs.unlink(mainFilePath, () => {});
+      if (artwork.original_path) {
+        fs.unlink(path.join(originalsDir, path.basename(artwork.original_path)), () => {});
+      }
     }
 
     db.prepare('DELETE FROM artwork_images WHERE artwork_id = ?').run(artworkId);
@@ -317,7 +350,7 @@ router.post('/artworks/bulk-delete', requireAdmin, (req, res) => {
   res.json({ ok: true, deleted: validIds.length });
 });
 
-router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single('image')), (req, res) => {
+router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single('image')), async (req, res) => {
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   if (!artwork) return res.redirect('/admin');
 
@@ -333,38 +366,54 @@ router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single
     });
   }
 
-  let imagePath = artwork.image_path;
-  let orientation = artwork.orientation;
-  if (req.file) {
-    imagePath = `/uploads/${req.file.filename}`;
-    orientation = detectOrientation(req.file.path);
-    // remove old image file if it lived in our uploads folder
-    const oldFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
-    fs.unlink(oldFile, () => {});
+  try {
+    let imagePath = artwork.image_path;
+    let originalPath = artwork.original_path;
+    let orientation = artwork.orientation;
+
+    if (req.file) {
+      orientation = detectOrientation(req.file.path);
+      const split = await splitUploadedFile(req.file);
+      imagePath = split.imagePath;
+      originalPath = split.originalFilename;
+
+      // remove old preview file
+      const oldPreview = path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
+      fs.unlink(oldPreview, () => {});
+      // remove old private original, if one exists
+      if (artwork.original_path) {
+        const oldOriginal = path.join(originalsDir, path.basename(artwork.original_path));
+        fs.unlink(oldOriginal, () => {});
+      }
+    }
+
+    db.prepare(`
+      UPDATE artworks
+      SET title = ?, description = ?, image_path = ?, original_path = ?, dimensions = ?, material = ?, orientation = ?, ships_as_canvas = ?,
+          price_retail = ?, price_bulk_packaging = ?, price_bulk_no_packaging = ?
+      WHERE id = ?
+    `).run(
+      title.trim(),
+      (description || '').trim(),
+      imagePath,
+      originalPath,
+      (dimensions || '').trim() || '8.5" x 11"',
+      (material || '').trim(),
+      orientation,
+      shipsAsCanvas,
+      parseFloat(price_retail) || 45.00,
+      parseFloat(price_bulk_packaging) || 30.00,
+      parseFloat(price_bulk_no_packaging) || 25.00,
+      artwork.id
+    );
+
+    setArtworkCategories(artwork.id, categoryIds);
+
+    res.redirect('/admin');
+  } catch (err) {
+    console.error('Error processing edited artwork image:', err);
+    res.redirect('/admin?uploadError=' + encodeURIComponent('Could not process that image. Please try a different file.'));
   }
-
-  db.prepare(`
-    UPDATE artworks
-    SET title = ?, description = ?, image_path = ?, dimensions = ?, material = ?, orientation = ?, ships_as_canvas = ?,
-        price_retail = ?, price_bulk_packaging = ?, price_bulk_no_packaging = ?
-    WHERE id = ?
-  `).run(
-    title.trim(),
-    (description || '').trim(),
-    imagePath,
-    (dimensions || '').trim() || '8.5" x 11"',
-    (material || '').trim(),
-    orientation,
-    shipsAsCanvas,
-    parseFloat(price_retail) || 45.00,
-    parseFloat(price_bulk_packaging) || 30.00,
-    parseFloat(price_bulk_no_packaging) || 25.00,
-    artwork.id
-  );
-
-  setArtworkCategories(artwork.id, categoryIds);
-
-  res.redirect('/admin');
 });
 
 router.post('/artworks/:id/delete', requireAdmin, (req, res) => {
@@ -373,10 +422,16 @@ router.post('/artworks/:id/delete', requireAdmin, (req, res) => {
   extraImages.forEach(img => {
     const filePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(img.image_path));
     fs.unlink(filePath, () => {});
+    if (img.original_path) {
+      fs.unlink(path.join(originalsDir, path.basename(img.original_path)), () => {});
+    }
   });
   if (artwork) {
     const mainFilePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
     fs.unlink(mainFilePath, () => {});
+    if (artwork.original_path) {
+      fs.unlink(path.join(originalsDir, path.basename(artwork.original_path)), () => {});
+    }
   }
   db.prepare('DELETE FROM artwork_images WHERE artwork_id = ?').run(req.params.id);
   db.prepare('DELETE FROM artwork_categories WHERE artwork_id = ?').run(req.params.id);
@@ -386,21 +441,27 @@ router.post('/artworks/:id/delete', requireAdmin, (req, res) => {
 
 // ---------- Carousel images (additional photos per artwork) ----------
 
-router.post('/artworks/:id/images', requireAdmin, withUploadErrorHandling(upload.array('extra_images', 10)), (req, res) => {
+router.post('/artworks/:id/images', requireAdmin, withUploadErrorHandling(upload.array('extra_images', 10)), async (req, res) => {
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   if (!artwork) return res.redirect('/admin');
 
-  if (req.files && req.files.length) {
-    const maxPos = db.prepare('SELECT MAX(position) AS m FROM artwork_images WHERE artwork_id = ?').get(artwork.id).m;
-    let position = (maxPos === null ? 0 : maxPos + 1);
-    const insert = db.prepare('INSERT INTO artwork_images (artwork_id, image_path, position) VALUES (?, ?, ?)');
-    req.files.forEach(file => {
-      insert.run(artwork.id, `/uploads/${file.filename}`, position);
-      position++;
-    });
-  }
+  try {
+    if (req.files && req.files.length) {
+      const maxPos = db.prepare('SELECT MAX(position) AS m FROM artwork_images WHERE artwork_id = ?').get(artwork.id).m;
+      let position = (maxPos === null ? 0 : maxPos + 1);
+      const insert = db.prepare('INSERT INTO artwork_images (artwork_id, image_path, original_path, position) VALUES (?, ?, ?, ?)');
+      for (const file of req.files) {
+        const { imagePath, originalFilename } = await splitUploadedFile(file);
+        insert.run(artwork.id, imagePath, originalFilename, position);
+        position++;
+      }
+    }
 
-  res.redirect(`/admin/artworks/${artwork.id}/edit`);
+    res.redirect(`/admin/artworks/${artwork.id}/edit`);
+  } catch (err) {
+    console.error('Error processing carousel image upload:', err);
+    res.redirect('/admin?uploadError=' + encodeURIComponent('Could not process one of those images. Please try again.'));
+  }
 });
 
 router.post('/artworks/:id/images/:imageId/delete', requireAdmin, (req, res) => {
@@ -409,9 +470,84 @@ router.post('/artworks/:id/images/:imageId/delete', requireAdmin, (req, res) => 
   if (image) {
     const filePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(image.image_path));
     fs.unlink(filePath, () => {});
+    if (image.original_path) {
+      fs.unlink(path.join(originalsDir, path.basename(image.original_path)), () => {});
+    }
     db.prepare('DELETE FROM artwork_images WHERE id = ?').run(image.id);
   }
   res.redirect(`/admin/artworks/${req.params.id}/edit`);
+});
+
+// ---------- Download full-resolution originals (admin only, never public) ----------
+
+router.get('/artworks/:id/original', requireAdmin, (req, res) => {
+  const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
+  if (!artwork) return res.redirect('/admin');
+
+  const filename = artwork.original_path
+    ? path.join(originalsDir, path.basename(artwork.original_path))
+    : path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
+
+  res.download(filename, `${slugify(artwork.title) || 'artwork'}-original${path.extname(filename)}`);
+});
+
+router.get('/artworks/:id/images/:imageId/original', requireAdmin, (req, res) => {
+  const image = db.prepare('SELECT * FROM artwork_images WHERE id = ? AND artwork_id = ?')
+    .get(req.params.imageId, req.params.id);
+  if (!image) return res.redirect('/admin');
+
+  const filename = image.original_path
+    ? path.join(originalsDir, path.basename(image.original_path))
+    : path.join(__dirname, '..', 'data', 'uploads', path.basename(image.image_path));
+
+  res.download(filename, `carousel-image-original${path.extname(filename)}`);
+});
+
+// One-time migration: for art added before this feature existed, generates a
+// preview from the current (full-res, currently public) file and moves that
+// original file into the private folder — so existing pieces get the same
+// protection without needing to be manually re-uploaded.
+router.post('/regenerate-previews', requireAdmin, async (req, res) => {
+  try {
+    const artworks = db.prepare('SELECT * FROM artworks WHERE original_path IS NULL').all();
+    for (const art of artworks) {
+      const currentFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(art.image_path));
+      if (!fs.existsSync(currentFile)) continue;
+
+      const originalFilename = `migrated-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(currentFile)}`;
+      const originalDest = path.join(originalsDir, originalFilename);
+      const previewFilename = `preview-${originalFilename}`;
+      const previewDest = path.join(__dirname, '..', 'data', 'uploads', previewFilename);
+
+      await createPreview(currentFile, previewDest);
+      fs.renameSync(currentFile, originalDest);
+
+      db.prepare('UPDATE artworks SET image_path = ?, original_path = ? WHERE id = ?')
+        .run(`/uploads/${previewFilename}`, originalFilename, art.id);
+    }
+
+    const extraImages = db.prepare('SELECT * FROM artwork_images WHERE original_path IS NULL').all();
+    for (const img of extraImages) {
+      const currentFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(img.image_path));
+      if (!fs.existsSync(currentFile)) continue;
+
+      const originalFilename = `migrated-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(currentFile)}`;
+      const originalDest = path.join(originalsDir, originalFilename);
+      const previewFilename = `preview-${originalFilename}`;
+      const previewDest = path.join(__dirname, '..', 'data', 'uploads', previewFilename);
+
+      await createPreview(currentFile, previewDest);
+      fs.renameSync(currentFile, originalDest);
+
+      db.prepare('UPDATE artwork_images SET image_path = ?, original_path = ? WHERE id = ?')
+        .run(`/uploads/${previewFilename}`, originalFilename, img.id);
+    }
+
+    res.redirect('/admin?migrated=' + (artworks.length + extraImages.length));
+  } catch (err) {
+    console.error('Error regenerating previews:', err);
+    res.redirect('/admin?uploadError=' + encodeURIComponent('Something went wrong protecting your existing art. Please try again.'));
+  }
 });
 
 // Move single item to very top or very bottom (used by "send to top/bottom" buttons)
