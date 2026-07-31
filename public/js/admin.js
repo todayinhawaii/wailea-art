@@ -132,6 +132,26 @@
       if (e.target.classList.contains('artwork-select-checkbox')) updateDeleteButton();
     });
 
+    // Shift-click to select a whole range at once, same as Finder/Explorer.
+    let lastClickedIndex = null;
+    document.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('artwork-select-checkbox')) return;
+
+      const boxes = checkboxes();
+      const currentIndex = boxes.indexOf(e.target);
+
+      if (e.shiftKey && lastClickedIndex !== null) {
+        const [start, end] = [lastClickedIndex, currentIndex].sort((a, b) => a - b);
+        const shouldCheck = e.target.checked;
+        for (let i = start; i <= end; i++) {
+          boxes[i].checked = shouldCheck;
+        }
+        updateDeleteButton();
+      }
+
+      lastClickedIndex = currentIndex;
+    });
+
     // Prevent checkbox clicks from starting a drag on the parent card.
     checkboxes().forEach(cb => {
       cb.addEventListener('mousedown', (e) => e.stopPropagation());
