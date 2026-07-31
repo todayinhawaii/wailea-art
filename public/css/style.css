@@ -103,12 +103,15 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .intro {
   padding: 48px 0 20px;
   max-width: 620px;
+  margin: 0 auto;
+  text-align: center;
 }
 .intro p {
   color: var(--ink-soft);
   font-size: 1.05rem;
   margin: 0;
 }
+.intro p + p { margin-top: 0.9em; }
 .intro h1 { font-size: 2.1rem; margin-bottom: 0.3em; }
 
 /* ---------- category pills ---------- */
