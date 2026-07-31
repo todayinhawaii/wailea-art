@@ -105,6 +105,18 @@
   <% } %>
 </main>
 
+<!-- Image lightbox -->
+<div class="lightbox-overlay" id="lightboxOverlay">
+  <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Close">&times;</button>
+  <button type="button" class="lightbox-arrow lightbox-arrow-prev" id="lightboxPrev" aria-label="Previous image">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+  </button>
+  <img id="lightboxImage" src="" alt="">
+  <button type="button" class="lightbox-arrow lightbox-arrow-next" id="lightboxNext" aria-label="Next image">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+  </button>
+</div>
+
 <!-- Buy modal -->
 <div class="modal-overlay" id="buyModal">
   <div class="modal">
