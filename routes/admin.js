@@ -524,59 +524,50 @@ router.get('/artworks/:id/images/:imageId/original', requireAdmin, (req, res) =>
 // original file into the private folder — so existing pieces get the same
 // protection without needing to be manually re-uploaded.
 router.post('/regenerate-previews', requireAdmin, async (req, res) => {
-  // Process a small batch per request rather than everything at once —
-  // resizing many large images can take longer than a single request is
-  // allowed to run, which would otherwise cause a 502 timeout. The page
-  // auto-resubmits this a few times in a row until nothing is left.
-  const BATCH_SIZE = 4;
+  // Process for a fixed TIME budget rather than a fixed count of images —
+  // real photos vary a lot in size, so a count-based batch can still be too
+  // slow for some images and too conservative for others. Stopping based on
+  // elapsed time instead keeps every single request safely short, no matter
+  // how large or slow any particular photo turns out to be.
+  const MAX_BATCH_TIME_MS = 6000; // 6 seconds — very conservative
+  const MAX_IMAGES_PER_REQUEST = 1; // one at a time — confirmed necessary: a single real JPEG photo can take several seconds by itself
+  const startTime = Date.now();
+  const timeIsUp = () => Date.now() - startTime > MAX_BATCH_TIME_MS;
+
+  async function processOne(table, row) {
+    const currentFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(row.image_path));
+    if (!fs.existsSync(currentFile)) {
+      db.prepare(`UPDATE ${table} SET original_path = ? WHERE id = ?`).run('missing', row.id);
+      return;
+    }
+
+    const originalFilename = `migrated-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(currentFile)}`;
+    const originalDest = path.join(originalsDir, originalFilename);
+    const previewFilename = `preview-${originalFilename}`;
+    const previewDest = path.join(__dirname, '..', 'data', 'uploads', previewFilename);
+
+    await createPreview(currentFile, previewDest);
+    fs.renameSync(currentFile, originalDest);
+
+    db.prepare(`UPDATE ${table} SET image_path = ?, original_path = ? WHERE id = ?`)
+      .run(`/uploads/${previewFilename}`, originalFilename, row.id);
+  }
 
   try {
     let processed = 0;
 
-    const artworks = db.prepare('SELECT * FROM artworks WHERE original_path IS NULL LIMIT ?').all(BATCH_SIZE);
+    const artworks = db.prepare('SELECT * FROM artworks WHERE original_path IS NULL LIMIT 200').all();
     for (const art of artworks) {
-      const currentFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(art.image_path));
-      if (!fs.existsSync(currentFile)) {
-        // File's already missing — mark it done anyway so it doesn't loop forever.
-        db.prepare('UPDATE artworks SET original_path = ? WHERE id = ?').run('missing', art.id);
-        processed++;
-        continue;
-      }
-
-      const originalFilename = `migrated-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(currentFile)}`;
-      const originalDest = path.join(originalsDir, originalFilename);
-      const previewFilename = `preview-${originalFilename}`;
-      const previewDest = path.join(__dirname, '..', 'data', 'uploads', previewFilename);
-
-      await createPreview(currentFile, previewDest);
-      fs.renameSync(currentFile, originalDest);
-
-      db.prepare('UPDATE artworks SET image_path = ?, original_path = ? WHERE id = ?')
-        .run(`/uploads/${previewFilename}`, originalFilename, art.id);
+      if (timeIsUp() || processed >= MAX_IMAGES_PER_REQUEST) break;
+      await processOne('artworks', art);
       processed++;
     }
 
-    if (processed < BATCH_SIZE) {
-      const remainingSlots = BATCH_SIZE - processed;
-      const extraImages = db.prepare('SELECT * FROM artwork_images WHERE original_path IS NULL LIMIT ?').all(remainingSlots);
+    if (!timeIsUp() && processed < MAX_IMAGES_PER_REQUEST) {
+      const extraImages = db.prepare('SELECT * FROM artwork_images WHERE original_path IS NULL LIMIT 200').all();
       for (const img of extraImages) {
-        const currentFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(img.image_path));
-        if (!fs.existsSync(currentFile)) {
-          db.prepare('UPDATE artwork_images SET original_path = ? WHERE id = ?').run('missing', img.id);
-          processed++;
-          continue;
-        }
-
-        const originalFilename = `migrated-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(currentFile)}`;
-        const originalDest = path.join(originalsDir, originalFilename);
-        const previewFilename = `preview-${originalFilename}`;
-        const previewDest = path.join(__dirname, '..', 'data', 'uploads', previewFilename);
-
-        await createPreview(currentFile, previewDest);
-        fs.renameSync(currentFile, originalDest);
-
-        db.prepare('UPDATE artwork_images SET image_path = ?, original_path = ? WHERE id = ?')
-          .run(`/uploads/${previewFilename}`, originalFilename, img.id);
+        if (timeIsUp() || processed >= MAX_IMAGES_PER_REQUEST) break;
+        await processOne('artwork_images', img);
         processed++;
       }
     }
