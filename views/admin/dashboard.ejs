@@ -24,10 +24,22 @@
           <%= unprotectedCount %> image<%= unprotectedCount === 1 ? '' : 's' %> from before this feature existed are still showing full resolution publicly. One click makes them safe too.
         </p>
       </div>
-      <form method="POST" action="/admin/regenerate-previews" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Protecting…';">
+      <form method="POST" action="/admin/regenerate-previews" id="protectArtForm" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Protecting…';">
         <button class="btn btn-primary btn-sm" type="submit">Protect existing art</button>
       </form>
     </div>
+  <% } %>
+
+  <% if (typeof autoContinueProtection !== 'undefined' && autoContinueProtection) { %>
+    <script>
+      // A batch just finished but more remain — automatically continue
+      // after a short pause, so the whole thing finishes on its own
+      // without needing repeated manual clicks.
+      setTimeout(() => {
+        const form = document.getElementById('protectArtForm');
+        if (form) form.submit();
+      }, 900);
+    </script>
   <% } %>
 
   <div class="admin-grid">

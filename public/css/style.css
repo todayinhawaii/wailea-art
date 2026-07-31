@@ -101,7 +101,6 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 
 /* ---------- hero band ---------- */
 .hero-band {
-  background: #2b2c2e;
   padding: 10px 0;
 }
 .intro {
@@ -120,10 +119,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .intro h1 {
   font-size: 2.1rem;
   margin-bottom: 0.3em;
-  color: #f7f4ee;
+  color: #3a3a3c;
 }
 .intro p {
-  color: #b9b8b6;
+  color: #5c5c5e;
   font-size: 1.05rem;
   margin: 0;
 }

@@ -105,18 +105,26 @@ function normalizeCategoryIds(raw) {
 router.get('/', requireAdmin, (req, res) => {
   const bulkAdded = parseInt(req.query.bulkAdded, 10);
   const migrated = parseInt(req.query.migrated, 10);
+  const remaining = parseInt(req.query.remaining, 10);
   let success = null;
+  let autoContinueProtection = false;
+
   if (bulkAdded) {
     success = `Added ${bulkAdded} piece${bulkAdded === 1 ? '' : 's'} to your gallery. Click "Edit" on each to add a title, description, or categories.`;
   } else if (!isNaN(migrated)) {
-    success = migrated > 0
-      ? `Protected ${migrated} existing image${migrated === 1 ? '' : 's'} — full-resolution originals are now private.`
-      : 'Everything is already protected — no unprotected images found.';
+    if (migrated === 0 && (isNaN(remaining) || remaining === 0)) {
+      success = 'Everything is already protected — no unprotected images found.';
+    } else if (!isNaN(remaining) && remaining > 0) {
+      success = `Protected ${migrated} image${migrated === 1 ? '' : 's'} so far — ${remaining} more to go, continuing automatically…`;
+      autoContinueProtection = true;
+    } else {
+      success = `All done! Every image is now protected — full-resolution originals are private.`;
+    }
   }
 
   const uploadError = req.query.uploadError ? decodeURIComponent(req.query.uploadError) : null;
 
-  res.render('admin/dashboard', { ...dashboardData(), error: uploadError, success, page: 'admin' });
+  res.render('admin/dashboard', { ...dashboardData(), error: uploadError, success, autoContinueProtection, page: 'admin' });
 });
 
 // ---------- Categories ----------
@@ -484,9 +492,13 @@ router.get('/artworks/:id/original', requireAdmin, (req, res) => {
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   if (!artwork) return res.redirect('/admin');
 
-  const filename = artwork.original_path
+  let filename = (artwork.original_path && artwork.original_path !== 'missing')
     ? path.join(originalsDir, path.basename(artwork.original_path))
     : path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
+
+  if (!fs.existsSync(filename)) {
+    filename = path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
+  }
 
   res.download(filename, `${slugify(artwork.title) || 'artwork'}-original${path.extname(filename)}`);
 });
@@ -496,9 +508,13 @@ router.get('/artworks/:id/images/:imageId/original', requireAdmin, (req, res) =>
     .get(req.params.imageId, req.params.id);
   if (!image) return res.redirect('/admin');
 
-  const filename = image.original_path
+  let filename = (image.original_path && image.original_path !== 'missing')
     ? path.join(originalsDir, path.basename(image.original_path))
     : path.join(__dirname, '..', 'data', 'uploads', path.basename(image.image_path));
+
+  if (!fs.existsSync(filename)) {
+    filename = path.join(__dirname, '..', 'data', 'uploads', path.basename(image.image_path));
+  }
 
   res.download(filename, `carousel-image-original${path.extname(filename)}`);
 });
@@ -508,11 +524,24 @@ router.get('/artworks/:id/images/:imageId/original', requireAdmin, (req, res) =>
 // original file into the private folder — so existing pieces get the same
 // protection without needing to be manually re-uploaded.
 router.post('/regenerate-previews', requireAdmin, async (req, res) => {
+  // Process a small batch per request rather than everything at once —
+  // resizing many large images can take longer than a single request is
+  // allowed to run, which would otherwise cause a 502 timeout. The page
+  // auto-resubmits this a few times in a row until nothing is left.
+  const BATCH_SIZE = 4;
+
   try {
-    const artworks = db.prepare('SELECT * FROM artworks WHERE original_path IS NULL').all();
+    let processed = 0;
+
+    const artworks = db.prepare('SELECT * FROM artworks WHERE original_path IS NULL LIMIT ?').all(BATCH_SIZE);
     for (const art of artworks) {
       const currentFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(art.image_path));
-      if (!fs.existsSync(currentFile)) continue;
+      if (!fs.existsSync(currentFile)) {
+        // File's already missing — mark it done anyway so it doesn't loop forever.
+        db.prepare('UPDATE artworks SET original_path = ? WHERE id = ?').run('missing', art.id);
+        processed++;
+        continue;
+      }
 
       const originalFilename = `migrated-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(currentFile)}`;
       const originalDest = path.join(originalsDir, originalFilename);
@@ -524,26 +553,38 @@ router.post('/regenerate-previews', requireAdmin, async (req, res) => {
 
       db.prepare('UPDATE artworks SET image_path = ?, original_path = ? WHERE id = ?')
         .run(`/uploads/${previewFilename}`, originalFilename, art.id);
+      processed++;
     }
 
-    const extraImages = db.prepare('SELECT * FROM artwork_images WHERE original_path IS NULL').all();
-    for (const img of extraImages) {
-      const currentFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(img.image_path));
-      if (!fs.existsSync(currentFile)) continue;
+    if (processed < BATCH_SIZE) {
+      const remainingSlots = BATCH_SIZE - processed;
+      const extraImages = db.prepare('SELECT * FROM artwork_images WHERE original_path IS NULL LIMIT ?').all(remainingSlots);
+      for (const img of extraImages) {
+        const currentFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(img.image_path));
+        if (!fs.existsSync(currentFile)) {
+          db.prepare('UPDATE artwork_images SET original_path = ? WHERE id = ?').run('missing', img.id);
+          processed++;
+          continue;
+        }
 
-      const originalFilename = `migrated-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(currentFile)}`;
-      const originalDest = path.join(originalsDir, originalFilename);
-      const previewFilename = `preview-${originalFilename}`;
-      const previewDest = path.join(__dirname, '..', 'data', 'uploads', previewFilename);
+        const originalFilename = `migrated-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(currentFile)}`;
+        const originalDest = path.join(originalsDir, originalFilename);
+        const previewFilename = `preview-${originalFilename}`;
+        const previewDest = path.join(__dirname, '..', 'data', 'uploads', previewFilename);
 
-      await createPreview(currentFile, previewDest);
-      fs.renameSync(currentFile, originalDest);
+        await createPreview(currentFile, previewDest);
+        fs.renameSync(currentFile, originalDest);
 
-      db.prepare('UPDATE artwork_images SET image_path = ?, original_path = ? WHERE id = ?')
-        .run(`/uploads/${previewFilename}`, originalFilename, img.id);
+        db.prepare('UPDATE artwork_images SET image_path = ?, original_path = ? WHERE id = ?')
+          .run(`/uploads/${previewFilename}`, originalFilename, img.id);
+        processed++;
+      }
     }
 
-    res.redirect('/admin?migrated=' + (artworks.length + extraImages.length));
+    const stillRemaining = db.prepare('SELECT COUNT(*) AS c FROM artworks WHERE original_path IS NULL').get().c
+      + db.prepare('SELECT COUNT(*) AS c FROM artwork_images WHERE original_path IS NULL').get().c;
+
+    res.redirect(`/admin?migrated=${processed}&remaining=${stillRemaining}`);
   } catch (err) {
     console.error('Error regenerating previews:', err);
     res.redirect('/admin?uploadError=' + encodeURIComponent('Something went wrong protecting your existing art. Please try again.'));
