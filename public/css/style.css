@@ -170,7 +170,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   aspect-ratio: 4 / 5;
   width: 100%;
   overflow: hidden;
-  background: var(--sand-line);
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
