@@ -26,6 +26,68 @@
     });
   });
 
+  // ---------- Click-to-enlarge lightbox ----------
+  // Shows the same original, full-resolution image file just larger on
+  // screen — never a stretched-up thumbnail, so it stays crisp.
+  (function () {
+    const overlay = document.getElementById('lightboxOverlay');
+    if (!overlay) return;
+
+    const imageEl = document.getElementById('lightboxImage');
+    const closeBtn = document.getElementById('lightboxClose');
+    const prevBtn = document.getElementById('lightboxPrev');
+    const nextBtn = document.getElementById('lightboxNext');
+
+    let images = [];
+    let index = 0;
+
+    function render() {
+      imageEl.src = images[index];
+      const showNav = images.length > 1;
+      prevBtn.style.display = showNav ? 'flex' : 'none';
+      nextBtn.style.display = showNav ? 'flex' : 'none';
+    }
+
+    function open(imgList, startIndex) {
+      images = imgList;
+      index = startIndex;
+      render();
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function close() {
+      overlay.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    function step(delta) {
+      index = (index + delta + images.length) % images.length;
+      render();
+    }
+
+    document.querySelectorAll('.card-img').forEach(card => {
+      card.addEventListener('click', () => {
+        const slides = [...card.querySelectorAll('.carousel-slide')];
+        const srcs = slides.length ? slides.map(s => s.src) : [card.querySelector('img').src];
+        const activeIndex = Math.max(0, slides.findIndex(s => s.classList.contains('active')));
+        open(srcs, activeIndex);
+      });
+    });
+
+    closeBtn.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    prevBtn.addEventListener('click', (e) => { e.stopPropagation(); step(-1); });
+    nextBtn.addEventListener('click', (e) => { e.stopPropagation(); step(1); });
+
+    document.addEventListener('keydown', (e) => {
+      if (!overlay.classList.contains('open')) return;
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowLeft') step(-1);
+      if (e.key === 'ArrowRight') step(1);
+    });
+  })();
+
   const BULK_MIN_QTY = 10;
 
   const modal = document.getElementById('buyModal');
