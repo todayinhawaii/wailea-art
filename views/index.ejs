@@ -31,7 +31,7 @@
     <div class="gallery">
       <% artworks.forEach(function(art) { %>
         <div class="card">
-          <div class="card-img" data-carousel<% if (art.images.length > 1) { %> data-multi<% } %>>
+          <div class="card-img orientation-<%= art.orientation || 'portrait' %>" data-carousel<% if (art.images.length > 1) { %> data-multi<% } %>>
             <% art.images.forEach(function(imgPath, i) { %>
               <img src="<%= imgPath %>" alt="<%= art.title %> - Original Hawaii Art Print by Wailea Art" loading="lazy" class="carousel-slide <%= i === 0 ? 'active' : '' %>" data-index="<%= i %>">
             <% }); %>

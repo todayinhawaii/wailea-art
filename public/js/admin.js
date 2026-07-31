@@ -107,4 +107,58 @@
     bodyKey: 'orderedItems',
     parseAsInt: false
   });
+
+  // ---------- Bulk select & delete artworks ----------
+  (function () {
+    const selectAll = document.getElementById('selectAllArtworks');
+    const checkboxes = () => [...document.querySelectorAll('.artwork-select-checkbox')];
+    const deleteBtn = document.getElementById('deleteSelectedBtn');
+    const countEl = document.getElementById('selectedCount');
+    if (!selectAll || !deleteBtn) return;
+
+    function updateDeleteButton() {
+      const checked = checkboxes().filter(cb => cb.checked);
+      countEl.textContent = checked.length;
+      deleteBtn.style.display = checked.length > 0 ? 'inline-flex' : 'none';
+      selectAll.checked = checked.length > 0 && checked.length === checkboxes().length;
+    }
+
+    selectAll.addEventListener('change', () => {
+      checkboxes().forEach(cb => { cb.checked = selectAll.checked; });
+      updateDeleteButton();
+    });
+
+    document.addEventListener('change', (e) => {
+      if (e.target.classList.contains('artwork-select-checkbox')) updateDeleteButton();
+    });
+
+    // Prevent checkbox clicks from starting a drag on the parent card.
+    checkboxes().forEach(cb => {
+      cb.addEventListener('mousedown', (e) => e.stopPropagation());
+    });
+
+    deleteBtn.addEventListener('click', async () => {
+      const ids = checkboxes().filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
+      if (ids.length === 0) return;
+      if (!confirm(`Delete ${ids.length} piece${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting…';
+
+      try {
+        const res = await fetch('/admin/artworks/bulk-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids })
+        });
+        if (!res.ok) throw new Error('Server returned an error');
+        window.location.reload();
+      } catch (err) {
+        console.error('Bulk delete failed', err);
+        alert('Could not delete the selected pieces. Please try again.');
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = `Delete selected (${ids.length})`;
+      }
+    });
+  })();
 })();

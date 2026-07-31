@@ -8,6 +8,7 @@ const upload = require('../lib/upload');
 const requireAdmin = require('../lib/requireAdmin');
 const slugify = require('../lib/slugify');
 const excerptFromHtml = require('../lib/excerpt');
+const detectOrientation = require('../lib/detectOrientation');
 
 // ---------- Login ----------
 
@@ -189,16 +190,18 @@ router.post('/artworks', requireAdmin, upload.single('image'), (req, res) => {
 
   const maxPos = db.prepare('SELECT MAX(position) AS m FROM artworks').get().m;
   const position = (maxPos === null ? 0 : maxPos + 1);
+  const orientation = detectOrientation(req.file.path);
 
   const result = db.prepare(`
-    INSERT INTO artworks (title, description, image_path, dimensions, material, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO artworks (title, description, image_path, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     title.trim(),
     (description || '').trim(),
     `/uploads/${req.file.filename}`,
     (dimensions || '').trim() || '8.5" x 11"',
     (material || '').trim(),
+    orientation,
     shipsAsCanvas,
     parseFloat(price_retail) || 45.00,
     parseFloat(price_bulk_packaging) || 30.00,
@@ -226,17 +229,19 @@ router.post('/artworks/bulk', requireAdmin, upload.array('images', 60), (req, re
   let position = (maxPos === null ? 0 : maxPos + 1);
 
   const insert = db.prepare(`
-    INSERT INTO artworks (title, description, image_path, dimensions, material, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO artworks (title, description, image_path, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   req.files.forEach(file => {
+    const orientation = detectOrientation(file.path);
     const result = insert.run(
       titleFromFilename(file.originalname),
       (description || '').trim(),
       `/uploads/${file.filename}`,
       (dimensions || '').trim() || '8.5" x 11"',
       (material || '').trim(),
+      orientation,
       shipsAsCanvas,
       parseFloat(price_retail) || 45.00,
       parseFloat(price_bulk_packaging) || 30.00,
@@ -279,6 +284,36 @@ router.post('/artworks/reorder', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// Same important note as above: must stay registered before '/artworks/:id'.
+router.post('/artworks/bulk-delete', requireAdmin, (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No pieces selected.' });
+
+  const validIds = ids.map(id => parseInt(id, 10)).filter(Number.isInteger);
+
+  const deleteOne = db.transaction((artworkId) => {
+    const extraImages = db.prepare('SELECT * FROM artwork_images WHERE artwork_id = ?').all(artworkId);
+    extraImages.forEach(img => {
+      const filePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(img.image_path));
+      fs.unlink(filePath, () => {});
+    });
+
+    const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(artworkId);
+    if (artwork) {
+      const mainFilePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
+      fs.unlink(mainFilePath, () => {});
+    }
+
+    db.prepare('DELETE FROM artwork_images WHERE artwork_id = ?').run(artworkId);
+    db.prepare('DELETE FROM artwork_categories WHERE artwork_id = ?').run(artworkId);
+    db.prepare('DELETE FROM artworks WHERE id = ?').run(artworkId);
+  });
+
+  validIds.forEach(id => deleteOne(id));
+
+  res.json({ ok: true, deleted: validIds.length });
+});
+
 router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) => {
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   if (!artwork) return res.redirect('/admin');
@@ -296,8 +331,10 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
   }
 
   let imagePath = artwork.image_path;
+  let orientation = artwork.orientation;
   if (req.file) {
     imagePath = `/uploads/${req.file.filename}`;
+    orientation = detectOrientation(req.file.path);
     // remove old image file if it lived in our uploads folder
     const oldFile = path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
     fs.unlink(oldFile, () => {});
@@ -305,7 +342,7 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
 
   db.prepare(`
     UPDATE artworks
-    SET title = ?, description = ?, image_path = ?, dimensions = ?, material = ?, ships_as_canvas = ?,
+    SET title = ?, description = ?, image_path = ?, dimensions = ?, material = ?, orientation = ?, ships_as_canvas = ?,
         price_retail = ?, price_bulk_packaging = ?, price_bulk_no_packaging = ?
     WHERE id = ?
   `).run(
@@ -314,6 +351,7 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
     imagePath,
     (dimensions || '').trim() || '8.5" x 11"',
     (material || '').trim(),
+    orientation,
     shipsAsCanvas,
     parseFloat(price_retail) || 45.00,
     parseFloat(price_bulk_packaging) || 30.00,
@@ -327,12 +365,18 @@ router.post('/artworks/:id', requireAdmin, upload.single('image'), (req, res) =>
 });
 
 router.post('/artworks/:id/delete', requireAdmin, (req, res) => {
+  const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   const extraImages = db.prepare('SELECT * FROM artwork_images WHERE artwork_id = ?').all(req.params.id);
   extraImages.forEach(img => {
     const filePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(img.image_path));
     fs.unlink(filePath, () => {});
   });
+  if (artwork) {
+    const mainFilePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(artwork.image_path));
+    fs.unlink(mainFilePath, () => {});
+  }
   db.prepare('DELETE FROM artwork_images WHERE artwork_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM artwork_categories WHERE artwork_id = ?').run(req.params.id);
   db.prepare('DELETE FROM artworks WHERE id = ?').run(req.params.id);
   res.redirect('/admin');
 });
