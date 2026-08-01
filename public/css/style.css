@@ -101,11 +101,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 
 /* ---------- hero band ---------- */
 .hero-band {
-  padding: 10px 0;
+  padding: 0;
 }
 .intro {
-  padding: 44px 0 48px;
-  max-width: 620px;
+  padding: 18px 0 28px;
+  max-width: 900px;
   margin: 0 auto;
   text-align: center;
 }
@@ -113,18 +113,24 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   max-width: 560px;
   width: 100%;
   height: auto;
-  margin: 0 auto 18px;
+  margin: 0 auto 8px;
   display: block;
 }
 .intro h1 {
-  font-size: 2.1rem;
+  font-size: 1.9rem;
   margin-bottom: 0.3em;
   color: #3a3a3c;
+}
+@media (min-width: 640px) {
+  .intro h1 { white-space: nowrap; }
 }
 .intro p {
   color: #5c5c5e;
   font-size: 1.05rem;
   margin: 0;
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .intro p + p { margin-top: 0.9em; }
 
@@ -159,7 +165,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 30px;
-  padding: 24px 0 70px;
+  padding: 10px 0 70px;
 }
 @media (max-width: 900px) {
   .gallery { grid-template-columns: repeat(2, 1fr); gap: 22px; }
