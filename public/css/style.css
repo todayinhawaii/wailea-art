@@ -110,7 +110,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   text-align: center;
 }
 .hero-logo {
-  max-width: 280px;
+  max-width: 560px;
   width: 100%;
   height: auto;
   margin: 0 auto 18px;
