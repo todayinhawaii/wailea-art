@@ -146,7 +146,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   align-items: center;
   padding: 8px 18px;
   border-radius: 999px;
-  border: 1px solid var(--sand-line);
+  border: 1px solid #a36a36;
   background: var(--card);
   color: var(--ink-soft);
   font-size: 0.85rem;
@@ -176,7 +176,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 
 .card {
   background: var(--card);
-  border: 1px solid var(--sand-line);
+  border: 1px solid #a36a36;
   border-radius: var(--radius);
   overflow: hidden;
   display: flex;
