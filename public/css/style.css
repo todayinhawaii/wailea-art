@@ -119,7 +119,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .intro h1 {
   font-size: 1.9rem;
   margin-bottom: 0.3em;
-  color: #a36a36;
+  color: #447873;
 }
 @media (min-width: 640px) {
   .intro h1 { white-space: nowrap; }
@@ -176,7 +176,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 
 .card {
   background: var(--card);
-  border: 1px solid #a36a36;
+  border: 1px solid #447873;
   border-radius: var(--radius);
   overflow: hidden;
   display: flex;
