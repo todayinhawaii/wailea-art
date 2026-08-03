@@ -521,7 +521,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   object-fit: cover;
   aspect-ratio: 5 / 4;
   border-radius: var(--radius);
-  border: 1px solid #a36a36;
+  border: 1px solid #447873;
   box-shadow: var(--shadow);
   display: block;
 }
@@ -534,6 +534,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   max-width: 680px;
 }
 .page-content h1 { font-size: 2.1rem; }
+.about-heading { color: #447873; }
 .page-content p { color: var(--ink-soft); }
 .page-content .lede {
   font-size: 1.1rem;
