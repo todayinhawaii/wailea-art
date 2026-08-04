@@ -1,7 +1,8 @@
 <% pageTitle = post.title + ' | Wailea Art Journal' %>
 <% metaDescription = post.excerpt %>
 <% canonicalPath = '/blog/' + post.slug %>
-<% ogImage = post.featured_image %>
+<% ogImage = null; %>
+<% if (!/\.(mp4|webm|mov)$/i.test(post.featured_image)) { ogImage = post.featured_image } %>
 <%- include('partials/header') %>
 
 <main class="wrap">
@@ -12,7 +13,11 @@
     <h1><%= post.title %></h1>
 
     <div class="post-hero">
-      <img src="<%= post.featured_image %>" alt="<%= post.title %>">
+      <% if (/\.(mp4|webm|mov)$/i.test(post.featured_image)) { %>
+        <video src="<%= post.featured_image %>" autoplay muted loop playsinline></video>
+      <% } else { %>
+        <img src="<%= post.featured_image %>" alt="<%= post.title %>">
+      <% } %>
     </div>
 
     <div class="post-content">
@@ -28,7 +33,7 @@
   "@context": "https://schema.org",
   "@type": "BlogPosting",
   "headline": <%- JSON.stringify(post.title) %>,
-  "image": "<%= siteUrl %><%= post.featured_image %>",
+  <% if (ogImage) { %>"image": "<%= siteUrl %><%= ogImage %>",<% } %>
   "datePublished": "<%= post.published_at %>",
   "description": <%- JSON.stringify(post.excerpt) %>,
   "author": { "@type": "Organization", "name": "Wailea Art" },

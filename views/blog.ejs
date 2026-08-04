@@ -1,7 +1,7 @@
 <% pageTitle = 'Journal | Wailea Art — Hawaii & Maui Art Stories' %>
 <% metaDescription = 'Stories, inspiration, and behind-the-scenes from Wailea Art — a Maui-based art studio creating original Hawaii art prints.' %>
 <% canonicalPath = '/blog' %>
-<% if (posts.length > 0) { ogImage = posts[0].featured_image } %>
+<% if (posts.length > 0 && !/\.(mp4|webm|mov)$/i.test(posts[0].featured_image)) { ogImage = posts[0].featured_image } %>
 <%- include('partials/header') %>
 
 <main class="wrap">
@@ -19,7 +19,11 @@
       <% posts.forEach(function(post) { %>
         <div class="card">
           <a href="/blog/<%= post.slug %>" class="card-img" style="display:flex;">
-            <img src="<%= post.featured_image %>" alt="<%= post.title %>" loading="lazy">
+            <% if (/\.(mp4|webm|mov)$/i.test(post.featured_image)) { %>
+              <video src="<%= post.featured_image %>" autoplay muted loop playsinline></video>
+            <% } else { %>
+              <img src="<%= post.featured_image %>" alt="<%= post.title %>" loading="lazy">
+            <% } %>
           </a>
           <div class="card-body">
             <h3 class="card-title"><a href="/blog/<%= post.slug %>" style="color:inherit;"><%= post.title %></a></h3>

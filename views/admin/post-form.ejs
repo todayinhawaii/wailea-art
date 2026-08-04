@@ -14,7 +14,11 @@
   <div class="admin-card" style="max-width: 720px;">
     <% if (post) { %>
       <div style="margin-bottom: 18px;">
-        <img src="<%= post.featured_image %>" alt="<%= post.title %>" style="max-width: 220px; border-radius: 3px; border: 1px solid var(--sand-line);">
+        <% if (/\.(mp4|webm|mov)$/i.test(post.featured_image)) { %>
+          <video src="<%= post.featured_image %>" style="max-width: 220px; border-radius: 3px; border: 1px solid var(--sand-line);" controls muted></video>
+        <% } else { %>
+          <img src="<%= post.featured_image %>" alt="<%= post.title %>" style="max-width: 220px; border-radius: 3px; border: 1px solid var(--sand-line);">
+        <% } %>
       </div>
     <% } %>
 
@@ -25,8 +29,9 @@
       </div>
 
       <div class="field-group">
-        <label for="featured_image"><%= post ? 'Replace featured image (optional)' : 'Featured image' %></label>
-        <input type="file" id="featured_image" name="featured_image" accept="image/jpeg,image/png,image/webp" <%= post ? '' : 'required' %>>
+        <label for="featured_image"><%= post ? 'Replace cover — image or video (optional)' : 'Cover — image or video' %></label>
+        <input type="file" id="featured_image" name="featured_image" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" <%= post ? '' : 'required' %>>
+        <p style="font-size: 0.82rem; color: var(--ink-soft); margin: 6px 0 0;">A short video will autoplay (silently, on a loop) when someone lands on the post — great for a bit of motion, but keep it brief and lightweight so the page still loads fast.</p>
       </div>
 
       <div class="field-group">

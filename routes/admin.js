@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
-const { upload, withUploadErrorHandling } = require('../lib/upload');
+const { upload, uploadPostMedia, withUploadErrorHandling } = require('../lib/upload');
 const requireAdmin = require('../lib/requireAdmin');
 const slugify = require('../lib/slugify');
 const excerptFromHtml = require('../lib/excerpt');
@@ -621,7 +621,7 @@ router.get('/posts/new', requireAdmin, (req, res) => {
   res.render('admin/post-form', { post: null, error: null, page: 'admin' });
 });
 
-router.post('/posts', requireAdmin, withUploadErrorHandling(upload.single('featured_image')), (req, res) => {
+router.post('/posts', requireAdmin, withUploadErrorHandling(uploadPostMedia.single('featured_image')), (req, res) => {
   const { title, excerpt, content } = req.body;
 
   if (!title || !title.trim() || !req.file) {
@@ -653,7 +653,7 @@ router.get('/posts/:id/edit', requireAdmin, (req, res) => {
   res.render('admin/post-form', { post, error: null, page: 'admin' });
 });
 
-router.post('/posts/:id', requireAdmin, withUploadErrorHandling(upload.single('featured_image')), (req, res) => {
+router.post('/posts/:id', requireAdmin, withUploadErrorHandling(uploadPostMedia.single('featured_image')), (req, res) => {
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
   if (!post) return res.redirect('/admin');
 
