@@ -88,6 +88,27 @@
     if (saveBtn) {
       saveBtn.addEventListener('click', () => saveOrder(true));
     }
+
+    // To top / To bottom — move the item instantly in the page itself and
+    // auto-save, so the browser never reloads and the page never scrolls
+    // or jumps. The person's view stays exactly where it was.
+    list.querySelectorAll('.move-top-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = btn.closest('.sortable-item');
+        if (!item) return;
+        list.insertBefore(item, list.firstChild);
+        saveOrder();
+      });
+    });
+
+    list.querySelectorAll('.move-bottom-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = btn.closest('.sortable-item');
+        if (!item) return;
+        list.appendChild(item);
+        saveOrder();
+      });
+    });
   }
 
   setupSortableList({

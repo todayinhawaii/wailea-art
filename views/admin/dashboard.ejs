@@ -286,14 +286,8 @@
                 </div>
                 <div class="item-actions">
                   <a class="btn btn-secondary btn-sm" href="/admin/artworks/<%= art.id %>/edit">Edit</a>
-                  <form method="POST" action="/admin/artworks/<%= art.id %>/move">
-                    <input type="hidden" name="direction" value="top">
-                    <button class="btn btn-secondary btn-sm" type="submit">To top</button>
-                  </form>
-                  <form method="POST" action="/admin/artworks/<%= art.id %>/move">
-                    <input type="hidden" name="direction" value="bottom">
-                    <button class="btn btn-secondary btn-sm" type="submit">To bottom</button>
-                  </form>
+                  <button class="btn btn-secondary btn-sm move-top-btn" type="button">To top</button>
+                  <button class="btn btn-secondary btn-sm move-bottom-btn" type="button">To bottom</button>
                   <form method="POST" action="/admin/artworks/<%= art.id %>/delete" onsubmit="return confirm('Delete this piece? This cannot be undone.');">
                     <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
                   </form>

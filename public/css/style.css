@@ -648,6 +648,15 @@ form.stack .field-group { margin: 0 0 16px; }
 .sortable-item img {
   width: 46px; height: 60px; object-fit: cover; border-radius: 2px;
   border: 1px solid var(--sand-line);
+  position: relative;
+  cursor: zoom-in;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-radius 0.15s ease;
+}
+.sortable-item img:hover {
+  transform: scale(4.2);
+  z-index: 50;
+  box-shadow: 0 14px 34px rgba(43, 37, 32, 0.35);
+  border-radius: 4px;
 }
 .sortable-item .drag-handle {
   color: var(--ink-soft);
