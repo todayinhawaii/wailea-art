@@ -80,7 +80,7 @@ function dashboardData() {
     categories,
     pillOrder: buildPillOrder(categories, getAllPillPosition()),
     messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all(),
-    posts: db.prepare('SELECT * FROM posts ORDER BY published_at DESC').all(),
+    posts: db.prepare('SELECT * FROM posts ORDER BY position ASC, published_at DESC').all(),
     unprotectedCount
   };
 }
@@ -632,16 +632,19 @@ router.post('/posts', requireAdmin, withUploadErrorHandling(uploadPostMedia.sing
 
   const slug = uniqueSlug(title.trim());
   const finalExcerpt = (excerpt || '').trim() || excerptFromHtml(content);
+  const minPos = db.prepare('SELECT MIN(position) AS m FROM posts').get().m;
+  const position = (minPos === null ? 0 : minPos - 1);
 
   db.prepare(`
-    INSERT INTO posts (title, slug, featured_image, excerpt, content, published_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO posts (title, slug, featured_image, excerpt, content, position, published_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
   `).run(
     title.trim(),
     slug,
     `/uploads/${req.file.filename}`,
     finalExcerpt,
-    content || ''
+    content || '',
+    position
   );
 
   res.redirect('/admin');
@@ -651,6 +654,22 @@ router.get('/posts/:id/edit', requireAdmin, (req, res) => {
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
   if (!post) return res.redirect('/admin');
   res.render('admin/post-form', { post, error: null, page: 'admin' });
+});
+
+// IMPORTANT: this must stay registered BEFORE the generic '/posts/:id' route
+// below, otherwise Express matches "reorder" as if it were an :id and this
+// handler never runs — the exact same bug we fixed for artworks reordering.
+router.post('/posts/reorder', requireAdmin, (req, res) => {
+  const { orderedIds } = req.body;
+  if (!Array.isArray(orderedIds)) return res.status(400).json({ error: 'Invalid payload.' });
+
+  const update = db.prepare('UPDATE posts SET position = ? WHERE id = ?');
+  const tx = db.transaction((ids) => {
+    ids.forEach((id, index) => update.run(index, id));
+  });
+  tx(orderedIds);
+
+  res.json({ ok: true });
 });
 
 router.post('/posts/:id', requireAdmin, withUploadErrorHandling(uploadPostMedia.single('featured_image')), (req, res) => {

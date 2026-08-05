@@ -56,6 +56,7 @@ db.exec(`
     featured_image TEXT NOT NULL,
     excerpt TEXT NOT NULL DEFAULT '',
     content TEXT NOT NULL DEFAULT '',
+    position REAL NOT NULL DEFAULT 0,
     published_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -94,6 +95,16 @@ if (!artworkCols.includes('original_path')) {
 const artworkImageCols = db.prepare("PRAGMA table_info(artwork_images)").all().map(c => c.name);
 if (artworkImageCols.length && !artworkImageCols.includes('original_path')) {
   db.exec(`ALTER TABLE artwork_images ADD COLUMN original_path TEXT`);
+}
+
+const postCols = db.prepare("PRAGMA table_info(posts)").all().map(c => c.name);
+if (postCols.length && !postCols.includes('position')) {
+  db.exec(`ALTER TABLE posts ADD COLUMN position REAL NOT NULL DEFAULT 0`);
+  // Backfill so existing posts keep their current (newest-first) order
+  // instead of all landing on position 0 at once.
+  const existingPosts = db.prepare('SELECT id FROM posts ORDER BY published_at DESC').all();
+  const setPosition = db.prepare('UPDATE posts SET position = ? WHERE id = ?');
+  existingPosts.forEach((row, index) => setPosition.run(index, row.id));
 }
 
 module.exports = db;

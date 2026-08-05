@@ -219,23 +219,35 @@
           <h3 style="margin:0;">Blog posts</h3>
           <a class="btn btn-secondary btn-sm" href="/admin/posts/new">Write new post</a>
         </div>
-        <p style="color: var(--ink-soft); font-size: 0.85rem;">These show up on your Journal page.</p>
+        <p style="color: var(--ink-soft); font-size: 0.85rem;">These show up on your Journal page. Drag to reorder, or use the buttons below.</p>
 
         <% if (posts.length === 0) { %>
           <p style="color: var(--ink-soft); font-size: 0.9rem;">No posts yet — write your first one.</p>
         <% } else { %>
-          <div class="category-manage-list">
+          <ul class="sortable-list" id="postsSortableList">
             <% posts.forEach(function(p) { %>
-              <div class="category-manage-item">
-                <span><%= p.title %></span>
+              <li class="sortable-item" draggable="true" data-id="<%= p.id %>">
+                <span class="drag-handle">&#8942;&#8942;</span>
+                <% if (/\.(mp4|webm|mov)$/i.test(p.featured_image)) { %>
+                  <video src="<%= p.featured_image %>" muted></video>
+                <% } else { %>
+                  <img src="<%= p.featured_image %>" alt="<%= p.title %>">
+                <% } %>
+                <div class="item-title"><%= p.title %></div>
                 <div class="item-actions">
                   <a class="btn btn-secondary btn-sm" href="/admin/posts/<%= p.id %>/edit">Edit</a>
+                  <button class="btn btn-secondary btn-sm move-top-btn" type="button">To top</button>
+                  <button class="btn btn-secondary btn-sm move-bottom-btn" type="button">To bottom</button>
                   <form method="POST" action="/admin/posts/<%= p.id %>/delete" onsubmit="return confirm('Delete this post? This cannot be undone.');">
                     <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
                   </form>
                 </div>
-              </div>
+              </li>
             <% }); %>
+          </ul>
+          <div style="display:flex; align-items:center; gap:14px; margin-top:14px;">
+            <button class="btn btn-primary" type="button" id="savePostOrderBtn">Save order</button>
+            <span id="postOrderSaveStatus" style="font-size:0.85rem; opacity:0; transition:opacity 0.3s ease;"></span>
           </div>
         <% } %>
       </div>

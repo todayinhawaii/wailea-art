@@ -129,6 +129,15 @@
     parseAsInt: false
   });
 
+  setupSortableList({
+    listId: 'postsSortableList',
+    saveBtnId: 'savePostOrderBtn',
+    statusId: 'postOrderSaveStatus',
+    endpoint: '/admin/posts/reorder',
+    bodyKey: 'orderedIds',
+    parseAsInt: true
+  });
+
   // ---------- Bulk select & delete artworks ----------
   (function () {
     const selectAll = document.getElementById('selectAllArtworks');

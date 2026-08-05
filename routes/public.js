@@ -176,7 +176,7 @@ router.post('/contact', (req, res) => {
 });
 
 router.get('/blog', (req, res) => {
-  const posts = db.prepare('SELECT * FROM posts ORDER BY published_at DESC').all();
+  const posts = db.prepare('SELECT * FROM posts ORDER BY position ASC, published_at DESC').all();
   res.render('blog', { posts, page: 'blog' });
 });
 
