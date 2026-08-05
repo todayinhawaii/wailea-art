@@ -97,6 +97,7 @@
   const modeToggle = document.getElementById('modeToggle');
   const packagingGroup = document.getElementById('packagingGroup');
   const packagingToggle = document.getElementById('packagingToggle');
+  const packagingNote = document.getElementById('packagingNote');
   const qtyInput = document.getElementById('qtyInput');
   const qtyHint = document.getElementById('qtyHint');
   const orderTotal = document.getElementById('orderTotal');
@@ -108,6 +109,7 @@
   let packaging = true;
 
   function fmt(n) { return '$' + n.toFixed(2); }
+  function formatUnit(n) { return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2); }
 
   function unitPrice() {
     if (!current) return 0;
@@ -138,6 +140,10 @@
     [...modeToggle.children].forEach(b => b.classList.toggle('active', b.dataset.mode === 'retail'));
     [...packagingToggle.children].forEach(b => b.classList.toggle('active', b.dataset.packaging === '1'));
     packagingGroup.classList.add('hidden');
+
+    const pkgTotal = (data.bulkPkg * BULK_MIN_QTY).toFixed(2);
+    const nopkgTotal = (data.bulkNoPkg * BULK_MIN_QTY).toFixed(2);
+    packagingNote.textContent = `${BULK_MIN_QTY}x${formatUnit(data.bulkPkg)} = $${pkgTotal}. Packaging includes a protective plastic sleeve, support backing, and a white card envelope. Choosing "no packaging" reduces the price — ${BULK_MIN_QTY}x${formatUnit(data.bulkNoPkg)} = $${nopkgTotal} — but ships each individual print unprotected, although we group them together in a safe protective box.`;
 
     recalc();
     modal.classList.add('open');
