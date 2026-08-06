@@ -373,10 +373,16 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   align-items: start;
 }
 .artwork-hero {
-  aspect-ratio: auto;
   max-height: 640px;
   border-radius: var(--radius);
   overflow: hidden;
+  cursor: zoom-in;
+}
+.artwork-hero .carousel-slide {
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.artwork-hero:hover .carousel-slide.active {
+  transform: scale(1.09);
 }
 .artwork-hero img { object-fit: contain; }
 .artwork-details { padding-top: 4px; }
