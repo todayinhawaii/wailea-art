@@ -1,6 +1,7 @@
 <% pageTitle = 'Wailea Art | Original Hawaii & Maui Art Prints for Sale' %>
 <% metaDescription = 'Shop original Hawaii and Maui art prints from Wailea Art. Wall art inspired by Wailea, Kapalua, Lahaina, Oahu, Honolulu, Kauai and the Hawaiian islands. Retail and bulk pricing available.' %>
 <% canonicalPath = activeSlug ? ('/?category=' + activeSlug) : '/' %>
+<% noIndex = false %>
 <% if (artworks.length > 0) { ogImage = artworks[0].image_path } %>
 <%- include('partials/header') %>
 

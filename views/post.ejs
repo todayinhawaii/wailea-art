@@ -1,6 +1,7 @@
 <% pageTitle = post.title + ' | Wailea Art Journal' %>
 <% metaDescription = post.excerpt %>
 <% canonicalPath = '/blog/' + post.slug %>
+<% noIndex = false %>
 <% ogImage = null; %>
 <% if (!/\.(mp4|webm|mov)$/i.test(post.featured_image)) { ogImage = post.featured_image } %>
 <%- include('partials/header') %>

@@ -1,6 +1,7 @@
 <% pageTitle = 'Journal | Wailea Art — Hawaii & Maui Art Stories' %>
 <% metaDescription = 'Stories, inspiration, and behind-the-scenes from Wailea Art — a Maui-based art studio creating original Hawaii art prints.' %>
 <% canonicalPath = '/blog' %>
+<% noIndex = false %>
 <% if (posts.length > 0 && !/\.(mp4|webm|mov)$/i.test(posts[0].featured_image)) { ogImage = posts[0].featured_image } %>
 <%- include('partials/header') %>
 
