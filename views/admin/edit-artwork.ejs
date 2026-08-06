@@ -26,6 +26,10 @@
         <input type="text" id="title" name="title" value="<%= artwork.title %>" required>
       </div>
       <div class="field-group">
+        <label for="sku">Internal reference / SKU (optional — only you see this, never shown publicly)</label>
+        <input type="text" id="sku" name="sku" value="<%= artwork.sku || '' %>" placeholder="e.g. RT 537">
+      </div>
+      <div class="field-group">
         <label for="description">Description (optional)</label>
         <textarea id="description" name="description" rows="3"><%= artwork.description %></textarea>
       </div>

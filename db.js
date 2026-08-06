@@ -17,6 +17,7 @@ db.exec(`
     image_path TEXT NOT NULL,
     original_path TEXT,
     slug TEXT,
+    sku TEXT,
     dimensions TEXT NOT NULL DEFAULT '8.5" x 11"',
     material TEXT NOT NULL DEFAULT '',
     orientation TEXT NOT NULL DEFAULT 'portrait',
@@ -95,6 +96,9 @@ if (!artworkCols.includes('original_path')) {
 }
 if (!artworkCols.includes('slug')) {
   db.exec(`ALTER TABLE artworks ADD COLUMN slug TEXT`);
+}
+if (!artworkCols.includes('sku')) {
+  db.exec(`ALTER TABLE artworks ADD COLUMN sku TEXT`);
 }
 
 // Backfill slugs for any artwork that doesn't have one yet — existing

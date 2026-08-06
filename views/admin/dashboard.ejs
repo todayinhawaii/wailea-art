@@ -53,6 +53,10 @@
             <input type="text" id="title" name="title" required>
           </div>
           <div class="field-group">
+            <label for="sku">Internal reference / SKU (optional — only you see this, never shown publicly)</label>
+            <input type="text" id="sku" name="sku" placeholder="e.g. RT 537">
+          </div>
+          <div class="field-group">
             <label for="description">Description (optional)</label>
             <textarea id="description" name="description" rows="3"></textarea>
           </div>
@@ -289,7 +293,7 @@
                 <span class="drag-handle">&#8942;&#8942;</span>
                 <img src="<%= art.image_path %>" alt="<%= art.title %>">
                 <div class="item-title">
-                  <div><%= art.title %></div>
+                  <div><%= art.title %><% if (art.sku) { %> <span style="color:var(--ocean); font-size:0.78rem; font-weight:normal;">(<%= art.sku %>)</span><% } %></div>
                   <div style="font-size:0.76rem; color:var(--ink-soft);">
                     <%= art.dimensions %>
                     <% if (art.categories && art.categories.length) { %>

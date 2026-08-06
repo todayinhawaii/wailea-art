@@ -214,7 +214,7 @@ function titleFromFilename(filename) {
 }
 
 router.post('/artworks', requireAdmin, withUploadErrorHandling(upload.single('image')), async (req, res) => {
-  const { title, description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
+  const { title, description, sku, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
   const shipsAsCanvas = req.body.ships_as_canvas ? 1 : 0;
 
@@ -232,14 +232,15 @@ router.post('/artworks', requireAdmin, withUploadErrorHandling(upload.single('im
     const slug = uniqueArtworkSlug(title.trim());
 
     const result = db.prepare(`
-      INSERT INTO artworks (title, description, image_path, original_path, slug, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO artworks (title, description, image_path, original_path, slug, sku, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       title.trim(),
       (description || '').trim(),
       imagePath,
       originalFilename,
       slug,
+      (sku || '').trim(),
       (dimensions || '').trim() || '8.5" x 11"',
       (material || '').trim(),
       orientation,
@@ -380,7 +381,7 @@ router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   if (!artwork) return res.redirect('/admin');
 
-  const { title, description, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
+  const { title, description, sku, dimensions, material, price_retail, price_bulk_packaging, price_bulk_no_packaging } = req.body;
   const categoryIds = normalizeCategoryIds(req.body.category_ids);
   const shipsAsCanvas = req.body.ships_as_canvas ? 1 : 0;
 
@@ -417,7 +418,7 @@ router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single
 
     db.prepare(`
       UPDATE artworks
-      SET title = ?, description = ?, image_path = ?, original_path = ?, slug = ?, dimensions = ?, material = ?, orientation = ?, ships_as_canvas = ?,
+      SET title = ?, description = ?, image_path = ?, original_path = ?, slug = ?, sku = ?, dimensions = ?, material = ?, orientation = ?, ships_as_canvas = ?,
           price_retail = ?, price_bulk_packaging = ?, price_bulk_no_packaging = ?
       WHERE id = ?
     `).run(
@@ -426,6 +427,7 @@ router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single
       imagePath,
       originalPath,
       slug,
+      (sku || '').trim(),
       (dimensions || '').trim() || '8.5" x 11"',
       (material || '').trim(),
       orientation,
