@@ -56,7 +56,7 @@
             <% } %>
           </div>
           <div class="card-body">
-            <h3 class="card-title"><%= art.title %></h3>
+            <h3 class="card-title"><a href="/art/<%= art.slug %>" style="color:inherit; text-decoration:none;"><%= art.title %></a></h3>
             <p class="card-dimensions"><%= art.dimensions %><% if (art.material) { %> &middot; <%= art.material %><% } %></p>
             <% if (art.description) { %>
               <p class="card-desc"><%= art.description %></p>

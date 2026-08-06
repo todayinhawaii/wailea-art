@@ -101,6 +101,7 @@ router.get('/sitemap.xml', (req, res) => {
   const siteUrl = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
   const categories = db.prepare('SELECT slug FROM categories').all();
   const posts = db.prepare('SELECT slug, published_at FROM posts').all();
+  const artworkSlugs = db.prepare('SELECT slug FROM artworks WHERE slug IS NOT NULL').all();
 
   const urls = [
     { loc: `${siteUrl}/`, priority: '1.0', changefreq: 'weekly' },
@@ -113,6 +114,9 @@ router.get('/sitemap.xml', (req, res) => {
   });
   posts.forEach(p => {
     urls.push({ loc: `${siteUrl}/blog/${p.slug}`, priority: '0.6', changefreq: 'monthly' });
+  });
+  artworkSlugs.forEach(a => {
+    urls.push({ loc: `${siteUrl}/art/${a.slug}`, priority: '0.8', changefreq: 'monthly' });
   });
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -153,6 +157,25 @@ router.get('/', (req, res) => {
   }));
 
   res.render('index', { artworks, categories, pillOrder, activeSlug, bulkMinQty: BULK_MIN_QTY, page: 'home' });
+});
+
+router.get('/art/:slug', (req, res, next) => {
+  const art = db.prepare('SELECT * FROM artworks WHERE slug = ?').get(req.params.slug);
+  if (!art) return next();
+
+  const extraImages = db.prepare('SELECT image_path FROM artwork_images WHERE artwork_id = ? ORDER BY position ASC').all(art.id);
+  art.images = [art.image_path, ...extraImages.map(r => r.image_path)];
+
+  const related = db.prepare(`
+    SELECT * FROM artworks WHERE id != ? ORDER BY RANDOM() LIMIT 4
+  `).all(art.id);
+  const relatedExtraStmt = db.prepare('SELECT image_path FROM artwork_images WHERE artwork_id = ? ORDER BY position ASC LIMIT 1');
+  related.forEach(r => {
+    const extra = relatedExtraStmt.all(r.id);
+    r.images = [r.image_path, ...extra.map(x => x.image_path)];
+  });
+
+  res.render('artwork', { art, related, bulkMinQty: BULK_MIN_QTY, page: 'artwork' });
 });
 
 router.get('/about', (req, res) => {

@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const slugify = require('./lib/slugify');
 
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -15,6 +16,7 @@ db.exec(`
     description TEXT DEFAULT '',
     image_path TEXT NOT NULL,
     original_path TEXT,
+    slug TEXT,
     dimensions TEXT NOT NULL DEFAULT '8.5" x 11"',
     material TEXT NOT NULL DEFAULT '',
     orientation TEXT NOT NULL DEFAULT 'portrait',
@@ -90,6 +92,28 @@ if (!artworkCols.includes('orientation')) {
 }
 if (!artworkCols.includes('original_path')) {
   db.exec(`ALTER TABLE artworks ADD COLUMN original_path TEXT`);
+}
+if (!artworkCols.includes('slug')) {
+  db.exec(`ALTER TABLE artworks ADD COLUMN slug TEXT`);
+}
+
+// Backfill slugs for any artwork that doesn't have one yet — existing
+// pieces (added before individual pages existed) as well as any that
+// somehow slipped through without one.
+const artworksNeedingSlug = db.prepare('SELECT id, title FROM artworks WHERE slug IS NULL OR slug = ?').all('');
+if (artworksNeedingSlug.length) {
+  const setSlug = db.prepare('UPDATE artworks SET slug = ? WHERE id = ?');
+  const slugTaken = db.prepare('SELECT id FROM artworks WHERE slug = ? AND id != ?');
+  artworksNeedingSlug.forEach(row => {
+    let base = slugify(row.title) || 'art';
+    let finalSlug = base;
+    let n = 2;
+    while (slugTaken.get(finalSlug, row.id)) {
+      finalSlug = `${base}-${n}`;
+      n++;
+    }
+    setSlug.run(finalSlug, row.id);
+  });
 }
 
 const artworkImageCols = db.prepare("PRAGMA table_info(artwork_images)").all().map(c => c.name);

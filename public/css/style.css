@@ -364,6 +364,43 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 }
 .card-price .from { color: var(--ink-soft); font-family: 'Work Sans', sans-serif; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 6px; }
 
+/* ---------- individual artwork page ---------- */
+.artwork-page {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 48px;
+  padding: 40px 0 30px;
+  align-items: start;
+}
+.artwork-hero {
+  aspect-ratio: auto;
+  max-height: 640px;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.artwork-hero img { object-fit: contain; }
+.artwork-details { padding-top: 4px; }
+.artwork-back-link {
+  display: inline-block;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  text-decoration: none;
+  margin-bottom: 16px;
+}
+.artwork-back-link:hover { color: var(--ocean); }
+.artwork-details h1 { font-size: 1.9rem; margin: 0 0 6px; }
+.artwork-description { color: var(--ink-soft); margin: 16px 0; line-height: 1.6; }
+.artwork-price {
+  font-size: 1.6rem;
+  margin: 18px 0 16px;
+}
+.artwork-related { padding: 30px 0 60px; border-top: 1px solid var(--sand-line); margin-top: 20px; }
+.artwork-related h2 { font-size: 1.4rem; margin-bottom: 24px; }
+@media (max-width: 800px) {
+  .artwork-page { grid-template-columns: 1fr; gap: 24px; padding-top: 24px; }
+  .artwork-hero { max-height: 480px; }
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

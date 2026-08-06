@@ -71,6 +71,19 @@ function buildPillOrder(categories, allPosition) {
   return merged;
 }
 
+function uniqueArtworkSlug(title, ignoreId) {
+  let base = slugify(title) || 'art';
+  let finalSlug = base;
+  let n = 2;
+  while (true) {
+    const existing = db.prepare('SELECT id FROM artworks WHERE slug = ?').get(finalSlug);
+    if (!existing || existing.id === ignoreId) break;
+    finalSlug = `${base}-${n}`;
+    n++;
+  }
+  return finalSlug;
+}
+
 function dashboardData() {
   const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
   const unprotectedCount = db.prepare('SELECT COUNT(*) AS c FROM artworks WHERE original_path IS NULL').get().c
@@ -216,15 +229,17 @@ router.post('/artworks', requireAdmin, withUploadErrorHandling(upload.single('im
     const position = (maxPos === null ? 0 : maxPos + 1);
     const orientation = detectOrientation(req.file.path);
     const { imagePath, originalFilename } = await splitUploadedFile(req.file);
+    const slug = uniqueArtworkSlug(title.trim());
 
     const result = db.prepare(`
-      INSERT INTO artworks (title, description, image_path, original_path, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO artworks (title, description, image_path, original_path, slug, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       title.trim(),
       (description || '').trim(),
       imagePath,
       originalFilename,
+      slug,
       (dimensions || '').trim() || '8.5" x 11"',
       (material || '').trim(),
       orientation,
@@ -260,19 +275,22 @@ router.post('/artworks/bulk', requireAdmin, withUploadErrorHandling(upload.array
     let position = (maxPos === null ? 0 : maxPos + 1);
 
     const insert = db.prepare(`
-      INSERT INTO artworks (title, description, image_path, original_path, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO artworks (title, description, image_path, original_path, slug, dimensions, material, orientation, ships_as_canvas, price_retail, price_bulk_packaging, price_bulk_no_packaging, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const file of req.files) {
       const orientation = detectOrientation(file.path);
       const { imagePath, originalFilename } = await splitUploadedFile(file);
+      const pieceTitle = titleFromFilename(file.originalname);
+      const slug = uniqueArtworkSlug(pieceTitle);
 
       const result = insert.run(
-        titleFromFilename(file.originalname),
+        pieceTitle,
         (description || '').trim(),
         imagePath,
         originalFilename,
+        slug,
         (dimensions || '').trim() || '8.5" x 11"',
         (material || '').trim(),
         orientation,
@@ -395,9 +413,11 @@ router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single
       }
     }
 
+    const slug = title.trim() === artwork.title ? (artwork.slug || uniqueArtworkSlug(title.trim(), artwork.id)) : uniqueArtworkSlug(title.trim(), artwork.id);
+
     db.prepare(`
       UPDATE artworks
-      SET title = ?, description = ?, image_path = ?, original_path = ?, dimensions = ?, material = ?, orientation = ?, ships_as_canvas = ?,
+      SET title = ?, description = ?, image_path = ?, original_path = ?, slug = ?, dimensions = ?, material = ?, orientation = ?, ships_as_canvas = ?,
           price_retail = ?, price_bulk_packaging = ?, price_bulk_no_packaging = ?
       WHERE id = ?
     `).run(
@@ -405,6 +425,7 @@ router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single
       (description || '').trim(),
       imagePath,
       originalPath,
+      slug,
       (dimensions || '').trim() || '8.5" x 11"',
       (material || '').trim(),
       orientation,
