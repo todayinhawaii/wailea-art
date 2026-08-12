@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  passwordHash         String
+  name                 String?
+  createdAt            DateTime  @default(now())
+
+  // Stripe / membership status
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  subscriptionStatus   String    @default("inactive") // inactive | active | past_due | canceled
+
+  // Proof of consent — recorded the moment someone checks the box at signup
+  termsAcceptedAt      DateTime?
+  termsVersion         String?
+
+  // Stripe Connect — lets this person accept payments from their own
+  // clients, with the money going straight to their own bank, not ours
+  stripeConnectedAccountId String?   @unique
+  stripeConnectedStatus    String    @default("not_connected") // not_connected | pending | active
+
+  forms                Form[]
+  passwordResetTokens  PasswordResetToken[]
+}
+
+// A single-use, time-limited token for the "forgot password" flow.
+// We store a hash of the token, never the raw value — only the emailed
+// link itself contains the real token.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Form {
+  id            String   @id @default(cuid())
+  slug          String   @unique // used in public URL /f/{slug} and embed code
+  title         String   @default("Untitled form")
+  description   String?
+  theme         String   @default("ocean") // color theme for the public form
+  bgColorStart  String?  // optional custom background gradient start (hex)
+  bgColorEnd    String?  // optional custom background gradient end (hex)
+  bgOpacity     Int      @default(100) // 0-100 — lower this so a host site shows through when embedded
+  bgPadding     Int      @default(24)  // px of visible background framing around the form card (0-288, i.e. up to 3 inches)
+  logoUrl       String?  // small round logo, shown overlapping the banner (or alone if no banner)
+  logoSize      String   @default("medium") // small | medium | large
+  logoZoom      Float    @default(1)
+  logoOffsetX   Float    @default(0) // percent, drag position within the logo circle
+  logoOffsetY   Float    @default(0)
+  logoOpacity   Int      @default(100)
+  logoPosition  String   @default("left") // left | center | right — where it sits along the banner
+  logoVisible   Boolean  @default(true)   // lets someone keep a logo uploaded but hide it without losing their work
+  bannerUrl     String?  // wide rectangular banner shown across the top of the form, like a cover photo
+  bannerHeight  String   @default("medium") // small | medium | large
+  bannerZoom    Float    @default(1)
+  bannerOffsetX Float    @default(0) // percent, drag position within the banner
+  bannerOffsetY Float    @default(0)
+  bannerOpacity Int      @default(100)
+
+  // Custom submit button — either a pre-made image, or a blank pill shape
+  // with the owner's own typed text overlaid (any language, auto-fit)
+  submitButtonImageUrl  String?  // pre-made image OR blank pill image path; null = default coral button
+  submitButtonPillId    String?  // which curated pill shape (only set in custom-text mode)
+  submitButtonText      String?  // custom typed text (only used in custom-text mode)
+  submitButtonTextColor String?
+  submitButtonBold      Boolean  @default(false)
+  submitButtonFontFamily String?
+  submitButtonFontSize   Int?
+  submitButtonScale     Float    @default(1) // 0.6 - 1.6, keeps the button from ever looking absurd
+  submitButtonBgColor   String?  // overrides a CSS pill's default background with a solid color
+  submitButtonPhotoUrl     String?  // a customer's own photo, filling the pill shape
+  submitButtonPhotoZoom    Float    @default(1)
+  submitButtonPhotoOffsetX Float    @default(0)
+  submitButtonPhotoOffsetY Float    @default(0)
+  submitButtonPhotoOpacity Int      @default(100)
+  isPublished   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  fields        FormField[]
+  notifyEmails  NotifyEmail[]
+  submissions   Submission[]
+  clientRecipients FormClientRecipient[]
+}
+
+model FormField {
+  id          String   @id @default(cuid())
+  formId      String
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  type        String   // text | textarea | email | phone | number | date | time | address | dropdown | checkbox | radio | signature | heading | paragraph
+  label       String
+  placeholder String?
+  required    Boolean  @default(false)
+  options     String?  // JSON-encoded array, for dropdown/radio/checkbox; also used for time-step minutes
+  imageUrl    String?  // small photo shown beside the field — e.g. a product/package thumbnail
+  imageZoom   Float    @default(1)
+  imageOffsetX Float   @default(0) // percent, drag position within the circle
+  imageOffsetY Float   @default(0)
+  opacity     Int      @default(100) // 0-100, how see-through the field's pill is in the builder
+  strokeWidth Int      @default(0)   // px, outline thickness around the field's pill in the builder
+  strokeColor String?  // hex color for that outline
+  color       String?  // custom pill fill color override — null falls back to the type's default color
+  fontSize    Int?     // px, overrides the label's default text size
+  fontFamily  String?  // CSS font-family value, e.g. "Georgia, serif"
+  textCase    String?  // none | uppercase | lowercase | capitalize
+  labelAlign  String?  // left | center | right
+  collapsedByDefault Boolean @default(false) // for section_collapse fields — starts closed if true
+  paymentAmountType   String? // fixed | client — only used by payment fields
+  paymentFixedAmount  Int?    // in cents
+  paymentDescription  String?
+  bgColor        String?  // solid background color for the whole field bar
+  bgColorOpacity Int      @default(100) // separate from the overall field opacity — only fades the color, never the text
+  bgImageUrl     String?  // full-width photo behind the whole field bar (separate from the small corner thumbnail)
+  bgImageZoom    Float    @default(1)
+  bgImageOffsetX Float    @default(0)
+  bgImageOffsetY Float    @default(0)
+  bgImageOpacity Int      @default(100)
+  order       Int      @default(0)
+}
+
+// Additional recipient emails beyond the form owner's account email —
+// "unlimited emails" the signed form/response gets sent to.
+model NotifyEmail {
+  id      String @id @default(cuid())
+  formId  String
+  form    Form   @relation(fields: [formId], references: [id], onDelete: Cascade)
+  email   String
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  formId      String
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  data        String   // JSON-encoded { fieldId: value }
+  signatureUrl String? // base64 data URL of the signature, if the form has one
+  createdAt   DateTime @default(now())
+}
+
+// Tracks who a form has been emailed to, so the owner can quickly resend
+// (e.g. an amended contract) without retyping the address every time.
+model FormClientRecipient {
+  id         String   @id @default(cuid())
+  formId     String
+  form       Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  email      String
+  lastSentAt DateTime @default(now())
+  sendCount  Int      @default(1)
+
+  @@unique([formId, email])
+}
+
+// A queued admin broadcast (bulk or individual). Sending happens in small
+// batches over multiple requests rather than one long request, so it scales
+// safely to thousands of recipients without ever timing out — and the whole
+// job's state lives here in the database, so it survives page reloads,
+// browser tabs closing, or even a server restart mid-send.
+model BroadcastJob {
+  id              String   @id @default(cuid())
+  subject         String
+  message         String
+  createdByEmail  String
+  status          String   @default("pending") // pending | processing | completed
+  totalCount      Int      @default(0)
+  sentCount       Int      @default(0)
+  failedCount     Int      @default(0)
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  recipients      BroadcastRecipient[]
+}
+
+model BroadcastRecipient {
+  id        String    @id @default(cuid())
+  jobId     String
+  job       BroadcastJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  email     String
+  status    String    @default("pending") // pending | sent | failed
+  error     String?
+  sentAt    DateTime?
+
+  @@index([jobId, status])
+}
+
+// Messages submitted through the public contact form — replying to one from
+// the admin panel sends a fully branded email, unlike replying from a
+// personal inbox which can't carry the banner/logo treatment.
+model ContactMessage {
+  id        String    @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  status    String    @default("new") // new | replied
+  reply     String?
+  repliedAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// Emails blocked from submitting the contact form again — submissions from
+// a blocked address are silently dropped (never saved, never emailed),
+// so spammers get no signal that they've been blocked.
+model BlockedEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  reason    String?
+  blockedAt DateTime @default(now())
+}
+
+// Holds a person's answers safely while they're briefly at Stripe's page
+// paying — once payment is confirmed, this becomes a real Submission and
+// gets deleted. If they abandon payment, this just quietly expires unused.
+model PendingFormSubmission {
+  id              String   @id @default(cuid())
+  formId          String
+  data            String   // JSON: { values, signatureDataUrl }
+  stripeSessionId String?  @unique
+  createdAt       DateTime @default(now())
+}
