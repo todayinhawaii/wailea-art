@@ -147,6 +147,11 @@ function dashboardData() {
     storeProducts: getStoreProductsWithCategories(),
     storePillOrder: buildStorePillOrder(storeCategories, getStoreAllPillPosition()),
     storeComingSoon: isStoreComingSoon(),
+    printifyConnected: !!db.prepare("SELECT value FROM settings WHERE key = 'printify_shop_id'").get(),
+    printifyShopTitle: (db.prepare("SELECT value FROM settings WHERE key = 'printify_shop_title'").get() || {}).value || '',
+    printifyConfigured: printify.isConfigured(),
+    printifyPendingCount: db.prepare("SELECT COUNT(*) AS c FROM store_products WHERE source = 'printify' AND published = 0").get().c,
+    printifyPendingProducts: db.prepare("SELECT * FROM store_products WHERE source = 'printify' AND published = 0 ORDER BY id DESC").all(),
     messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all(),
     posts: db.prepare('SELECT * FROM posts ORDER BY position ASC, published_at DESC').all(),
     unprotectedCount
@@ -187,6 +192,16 @@ router.get('/', requireAdmin, (req, res) => {
       autoContinueProtection = true;
     } else {
       success = `All done! Every image is now protected — full-resolution originals are private.`;
+    }
+  } else if (req.query.printifyConnected) {
+    success = 'Connected to your Printify shop! Click "Sync from Printify" to pull in your products.';
+  } else if (req.query.printifySynced !== undefined) {
+    const synced = parseInt(req.query.printifySynced, 10) || 0;
+    const updated = parseInt(req.query.printifyUpdated, 10) || 0;
+    if (synced === 0 && updated === 0) {
+      success = 'Sync complete — no new or changed products found.';
+    } else {
+      success = `Synced from Printify: ${synced} new product${synced === 1 ? '' : 's'} to review` + (updated ? `, ${updated} existing updated.` : '.');
     }
   }
 
@@ -680,7 +695,107 @@ router.post('/artworks/:id/move', requireAdmin, (req, res) => {
 
 
 
+const printify = require('../lib/printify');
+
 // ---------- Store (Printify-ready product categories) ----------
+
+router.post('/printify/connect', requireAdmin, async (req, res) => {
+  const { shop_id, shop_title } = req.body;
+  if (!shop_id) return res.redirect('/admin?uploadError=' + encodeURIComponent('Please choose a shop.'));
+
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('printify_shop_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(shop_id);
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('printify_shop_title', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(shop_title || '');
+
+  res.redirect('/admin?printifyConnected=1');
+});
+
+router.post('/printify/disconnect', requireAdmin, (req, res) => {
+  db.prepare(`DELETE FROM settings WHERE key IN ('printify_shop_id', 'printify_shop_title')`).run();
+  res.redirect('/admin');
+});
+
+router.get('/printify/shops', requireAdmin, async (req, res) => {
+  try {
+    const shops = await printify.listShops();
+    res.render('admin/printify-shops', { shops, error: null, page: 'admin' });
+  } catch (err) {
+    console.error('Printify listShops error:', err.message);
+    res.render('admin/printify-shops', { shops: [], error: err.message, page: 'admin' });
+  }
+});
+
+function mapPrintifyProduct(p) {
+  const enabledVariants = (p.variants || []).filter(v => v.is_enabled !== false);
+  const cheapestVariant = enabledVariants.sort((a, b) => (a.price || 0) - (b.price || 0))[0];
+  const priceCents = cheapestVariant ? cheapestVariant.price : (p.variants && p.variants[0] ? p.variants[0].price : 0);
+  const price = priceCents ? priceCents / 100 : 25.00;
+
+  const defaultImage = (p.images || []).find(img => img.is_default) || (p.images || [])[0];
+  const imagePath = defaultImage ? defaultImage.src : '';
+
+  return {
+    printifyProductId: String(p.id),
+    title: p.title || 'Untitled product',
+    description: (p.description || '').replace(/<[^>]*>/g, '').trim().slice(0, 500),
+    imagePath,
+    price
+  };
+}
+
+router.post('/printify/sync', requireAdmin, async (req, res) => {
+  const shopIdRow = db.prepare("SELECT value FROM settings WHERE key = 'printify_shop_id'").get();
+  if (!shopIdRow) {
+    return res.redirect('/admin?uploadError=' + encodeURIComponent('Connect a Printify shop first.'));
+  }
+
+  try {
+    const products = await printify.listAllProducts(shopIdRow.value);
+    let imported = 0;
+    let updated = 0;
+
+    const findExisting = db.prepare('SELECT id FROM store_products WHERE printify_product_id = ?');
+    const insert = db.prepare(`
+      INSERT INTO store_products (title, slug, description, image_path, price, position, source, published, printify_product_id)
+      VALUES (?, ?, ?, ?, ?, ?, 'printify', 0, ?)
+    `);
+    const update = db.prepare(`
+      UPDATE store_products SET title = ?, description = ?, image_path = ?, price = ?
+      WHERE printify_product_id = ?
+    `);
+
+    for (const raw of products) {
+      const mapped = mapPrintifyProduct(raw);
+      if (!mapped.imagePath) continue; // skip products with no usable image
+
+      const existing = findExisting.get(mapped.printifyProductId);
+      if (existing) {
+        update.run(mapped.title, mapped.description, mapped.imagePath, mapped.price, mapped.printifyProductId);
+        updated++;
+      } else {
+        const maxPos = db.prepare('SELECT MAX(position) AS m FROM store_products').get().m;
+        const position = (maxPos === null ? 0 : maxPos + 1);
+        const slug = uniqueStoreProductSlug(mapped.title);
+        insert.run(mapped.title, slug, mapped.description, mapped.imagePath, mapped.price, position, mapped.printifyProductId);
+        imported++;
+      }
+    }
+
+    res.redirect(`/admin?printifySynced=${imported}&printifyUpdated=${updated}`);
+  } catch (err) {
+    console.error('Printify sync error:', err.message);
+    res.redirect('/admin?uploadError=' + encodeURIComponent('Printify sync failed: ' + err.message));
+  }
+});
+
+router.post('/store-products/:id/publish', requireAdmin, (req, res) => {
+  db.prepare('UPDATE store_products SET published = 1 WHERE id = ?').run(req.params.id);
+  res.redirect('/admin');
+});
+
+router.post('/store-products/:id/unpublish', requireAdmin, (req, res) => {
+  db.prepare('UPDATE store_products SET published = 0 WHERE id = ?').run(req.params.id);
+  res.redirect('/admin');
+});
 
 router.post('/store-coming-soon', requireAdmin, (req, res) => {
   const enabled = req.body.enabled === '1' ? '1' : '0';

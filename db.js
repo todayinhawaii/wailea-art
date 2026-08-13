@@ -72,6 +72,8 @@ db.exec(`
     price REAL NOT NULL DEFAULT 25.00,
     position REAL NOT NULL DEFAULT 0,
     source TEXT NOT NULL DEFAULT 'manual',
+    published INTEGER NOT NULL DEFAULT 1,
+    printify_product_id TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -162,6 +164,14 @@ if (postCols.length && !postCols.includes('position')) {
   const existingPosts = db.prepare('SELECT id FROM posts ORDER BY published_at DESC').all();
   const setPosition = db.prepare('UPDATE posts SET position = ? WHERE id = ?');
   existingPosts.forEach((row, index) => setPosition.run(index, row.id));
+}
+
+const storeProductCols = db.prepare("PRAGMA table_info(store_products)").all().map(c => c.name);
+if (storeProductCols.length && !storeProductCols.includes('published')) {
+  db.exec(`ALTER TABLE store_products ADD COLUMN published INTEGER NOT NULL DEFAULT 1`);
+}
+if (storeProductCols.length && !storeProductCols.includes('printify_product_id')) {
+  db.exec(`ALTER TABLE store_products ADD COLUMN printify_product_id TEXT`);
 }
 
 module.exports = db;

@@ -320,6 +320,51 @@
         <% } %>
       </div>
 
+      <div class="admin-card">
+        <h3 style="margin:0 0 8px;">Printify</h3>
+
+        <% if (!printifyConfigured) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">Not connected yet — add <code>PRINTIFY_API_TOKEN</code> as an environment variable in Render, then come back here.</p>
+        <% } else if (!printifyConnected) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">Your Printify token is connected. Choose which shop to pull products from:</p>
+          <a class="btn btn-primary btn-sm" href="/admin/printify/shops">Choose my Printify shop</a>
+        <% } else { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">
+            Connected to <strong><%= printifyShopTitle %></strong>.
+            <% if (printifyPendingCount > 0) { %>
+              <%= printifyPendingCount %> product<%= printifyPendingCount === 1 ? '' : 's' %> waiting for your review below.
+            <% } %>
+          </p>
+          <div style="display:flex; gap:10px; flex-wrap: wrap;">
+            <form method="POST" action="/admin/printify/sync">
+              <button class="btn btn-primary btn-sm" type="submit">Sync from Printify</button>
+            </form>
+            <form method="POST" action="/admin/printify/disconnect" onsubmit="return confirm('Disconnect this Printify shop? Already-imported products will stay in your store.');">
+              <button class="btn btn-secondary btn-sm" type="submit">Disconnect shop</button>
+            </form>
+          </div>
+
+          <% if (printifyPendingProducts.length > 0) { %>
+            <div style="margin-top: 20px; border-top: 1px solid var(--sand-line); padding-top: 16px;">
+              <h4 style="margin: 0 0 10px; font-size: 0.95rem;">Waiting for your review</h4>
+              <% printifyPendingProducts.forEach(function(pp) { %>
+                <div style="display:flex; align-items:center; gap:12px; padding: 8px 0; border-bottom: 1px solid var(--sand-line);">
+                  <img src="<%= pp.image_path %>" alt="<%= pp.title %>" style="width:44px; height:56px; object-fit:cover; border-radius:2px; border:1px solid var(--sand-line);">
+                  <div style="flex:1;">
+                    <div><%= pp.title %></div>
+                    <div style="font-size:0.78rem; color:var(--ink-soft);">$<%= pp.price.toFixed(2) %></div>
+                  </div>
+                  <a class="btn btn-secondary btn-sm" href="/admin/store-products/<%= pp.id %>/edit">Edit</a>
+                  <form method="POST" action="/admin/store-products/<%= pp.id %>/publish">
+                    <button class="btn btn-primary btn-sm" type="submit">Publish</button>
+                  </form>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+        <% } %>
+      </div>
+
       <div class="admin-card" style="background: <%= storeComingSoon ? '#fdf6e3' : 'var(--card)' %>; <%= storeComingSoon ? 'border-color: #e8d9a8;' : '' %>">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
           <div>

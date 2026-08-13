@@ -157,7 +157,7 @@ router.get('/', (req, res) => {
     images: [a.image_path, ...extraImagesStmt.all(a.id).map(r => r.image_path)]
   }));
 
-  const hasStoreProducts = db.prepare('SELECT COUNT(*) AS c FROM store_products').get().c > 0;
+  const hasStoreProducts = db.prepare('SELECT COUNT(*) AS c FROM store_products WHERE published = 1').get().c > 0;
   const storeComingSoonRow = db.prepare("SELECT value FROM settings WHERE key = 'store_coming_soon'").get();
   const storeComingSoon = !!storeComingSoonRow && storeComingSoonRow.value === '1';
   const showStorePill = hasStoreProducts || storeComingSoon;
@@ -191,11 +191,11 @@ router.get('/store', (req, res) => {
       SELECT DISTINCT p.* FROM store_products p
       JOIN store_product_categories pc ON pc.product_id = p.id
       JOIN store_categories c ON c.id = pc.category_id
-      WHERE c.slug = ?
+      WHERE c.slug = ? AND p.published = 1
       ORDER BY p.position ASC
     `).all(activeSlug);
   } else {
-    storeProducts = db.prepare('SELECT * FROM store_products ORDER BY position ASC').all();
+    storeProducts = db.prepare('SELECT * FROM store_products WHERE published = 1 ORDER BY position ASC').all();
   }
 
   res.render('store', { storeProducts, storeCategories, pillOrder, activeSlug, storeComingSoon: false, previewMode: isAdminPreview, page: 'store' });

@@ -1,0 +1,40 @@
+<% pageTitle = 'Connect Printify — Wailea Art' %>
+<% noIndex = true %>
+<%- include('../partials/header') %>
+
+<main class="wrap admin-shell">
+  <div class="admin-header">
+    <h1 style="margin:0;">Connect your Printify shop</h1>
+    <a class="btn btn-secondary btn-sm" href="/admin">Back to admin</a>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error">
+      Couldn't reach Printify: <%= error %>
+    </div>
+  <% } %>
+
+  <% if (!error && shops.length === 0) { %>
+    <div class="admin-card" style="max-width: 560px;">
+      <p>No shops found on this Printify account yet. Create a shop in Printify first, then come back here.</p>
+    </div>
+  <% } %>
+
+  <% if (shops.length > 0) { %>
+    <div class="admin-card" style="max-width: 560px;">
+      <p style="color: var(--ink-soft); font-size: 0.9rem;">Choose which Printify shop to connect to your "Our Store" page:</p>
+      <% shops.forEach(function(shop) { %>
+        <form method="POST" action="/admin/printify/connect" style="margin-bottom: 10px;">
+          <input type="hidden" name="shop_id" value="<%= shop.id %>">
+          <input type="hidden" name="shop_title" value="<%= shop.title %>">
+          <button class="btn btn-secondary btn-block" type="submit" style="text-align:left;">
+            <%= shop.title %>
+            <span style="color: var(--ink-soft); font-size: 0.82rem;"> (<%= shop.sales_channel %>)</span>
+          </button>
+        </form>
+      <% }); %>
+    </div>
+  <% } %>
+</main>
+
+<%- include('../partials/site-footer') %>
