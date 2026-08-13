@@ -168,10 +168,11 @@ router.get('/', (req, res) => {
 router.get('/store', (req, res) => {
   const storeComingSoonRow = db.prepare("SELECT value FROM settings WHERE key = 'store_coming_soon'").get();
   const storeComingSoon = !!storeComingSoonRow && storeComingSoonRow.value === '1';
+  const isAdminPreview = storeComingSoon && !!(req.session && req.session.isAdmin);
 
-  if (storeComingSoon) {
+  if (storeComingSoon && !isAdminPreview) {
     return res.render('store', {
-      storeProducts: [], storeCategories: [], pillOrder: [], activeSlug: null, storeComingSoon: true, page: 'store'
+      storeProducts: [], storeCategories: [], pillOrder: [], activeSlug: null, storeComingSoon: true, previewMode: false, page: 'store'
     });
   }
 
@@ -197,7 +198,7 @@ router.get('/store', (req, res) => {
     storeProducts = db.prepare('SELECT * FROM store_products ORDER BY position ASC').all();
   }
 
-  res.render('store', { storeProducts, storeCategories, pillOrder, activeSlug, storeComingSoon: false, page: 'store' });
+  res.render('store', { storeProducts, storeCategories, pillOrder, activeSlug, storeComingSoon: false, previewMode: isAdminPreview, page: 'store' });
 });
 
 router.get('/art/:slug', (req, res, next) => {
