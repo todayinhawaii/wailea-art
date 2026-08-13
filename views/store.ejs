@@ -1,0 +1,96 @@
+<% pageTitle = 'Our Store | Wailea Art' %>
+<% metaDescription = 'Shop more Hawaii-inspired gifts and products from Wailea Art, beyond our original art prints.' %>
+<% canonicalPath = activeSlug ? ('/store?category=' + activeSlug) : '/store' %>
+<% noIndex = false %>
+<% if (storeProducts.length > 0) { ogImage = storeProducts[0].image_path } %>
+<%- include('partials/header') %>
+
+<main class="wrap">
+  <% if (storeComingSoon) { %>
+    <div class="empty-state" style="padding: 80px 20px; text-align: center;">
+      <h1 style="font-size: 1.9rem; margin-bottom: 12px;">Aloha 🌺</h1>
+      <p style="font-size: 1.15rem; color: var(--ink-soft); max-width: 480px; margin: 0 auto 24px;">Our Store is currently under construction — we can't wait to show you!</p>
+      <a href="/" class="btn btn-secondary">&larr; Back to art gallery</a>
+    </div>
+  <% } else { %>
+
+  <div class="intro" style="padding-top: 30px;">
+    <h1 style="font-size: 1.9rem;">Our Store</h1>
+    <p>More Hawaii-inspired gifts and products, beyond our original art prints.</p>
+  </div>
+
+  <% if (storeCategories.length > 0) { %>
+    <div class="category-pills">
+      <% pillOrder.forEach(function(item) { %>
+        <% if (item.isAll) { %>
+          <a href="/store" class="pill <%= !activeSlug ? 'active' : '' %>">All</a>
+        <% } else { %>
+          <a href="/store?category=<%= item.slug %>" class="pill <%= activeSlug === item.slug ? 'active' : '' %>"><%= item.name %></a>
+        <% } %>
+      <% }); %>
+    </div>
+  <% } %>
+
+  <div style="margin: 6px 0 20px;">
+    <a href="/" class="artwork-back-link">&larr; Back to art gallery</a>
+  </div>
+
+  <% if (storeProducts.length === 0) { %>
+    <div class="empty-state">
+      <p><% if (activeSlug) { %>No products in this category yet.<% } else { %>New products are on their way — check back soon.<% } %></p>
+    </div>
+  <% } else { %>
+    <div class="gallery">
+      <% storeProducts.forEach(function(sp) { %>
+        <div class="card">
+          <div class="card-img orientation-<%= sp.orientation || 'portrait' %>">
+            <img src="<%= sp.image_path %>" alt="<%= sp.title %> - Wailea Art Store" loading="lazy" draggable="false" oncontextmenu="return false;">
+          </div>
+          <div class="card-body">
+            <h3 class="card-title"><%= sp.title %></h3>
+            <% if (sp.description) { %>
+              <p class="card-desc"><%= sp.description %></p>
+            <% } %>
+            <div class="card-price">
+              $<%= sp.price.toFixed(2) %>
+            </div>
+            <button
+              class="btn btn-primary btn-block js-open-store-buy"
+              data-id="<%= sp.id %>"
+              data-title="<%= sp.title %>"
+              data-price="<%= sp.price %>"
+            >Buy this item</button>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+  <% } %>
+</main>
+
+<!-- Store buy modal -->
+<div class="modal-overlay" id="storeBuyModal">
+  <div class="modal">
+    <button class="modal-close" id="storeCloseModal" aria-label="Close">&times;</button>
+    <h3 id="storeModalTitle">Item title</h3>
+
+    <div class="field-group">
+      <label for="storeQtyInput">Quantity</label>
+      <input type="number" id="storeQtyInput" min="1" value="1" step="1">
+    </div>
+
+    <div class="order-total">
+      <span>Total</span>
+      <span class="amt" id="storeOrderTotal">$0.00</span>
+    </div>
+
+    <p class="modal-error hidden" id="storeModalError"></p>
+
+    <button class="btn btn-primary btn-block" id="storeCheckoutBtn" style="margin-top:14px;">
+      Checkout with Stripe
+    </button>
+  </div>
+</div>
+
+<%- include('partials/site-footer') %>
+<script src="/js/gallery.js"></script>

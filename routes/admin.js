@@ -59,6 +59,56 @@ function getArtworksWithCategories() {
   return artworks.map(a => ({ ...a, categories: catStmt.all(a.id) }));
 }
 
+function getStoreProductsWithCategories() {
+  const products = db.prepare('SELECT * FROM store_products ORDER BY position ASC').all();
+  const catStmt = db.prepare(`
+    SELECT c.id, c.name FROM store_categories c
+    JOIN store_product_categories pc ON pc.category_id = c.id
+    WHERE pc.product_id = ?
+    ORDER BY c.name ASC
+  `);
+  return products.map(p => ({ ...p, categories: catStmt.all(p.id) }));
+}
+
+function setStoreProductCategories(productId, categoryIds) {
+  db.prepare('DELETE FROM store_product_categories WHERE product_id = ?').run(productId);
+  const insert = db.prepare('INSERT OR IGNORE INTO store_product_categories (product_id, category_id) VALUES (?, ?)');
+  const tx = db.transaction((ids) => {
+    ids.forEach(cid => insert.run(productId, cid));
+  });
+  tx(categoryIds);
+}
+
+function uniqueStoreProductSlug(title, ignoreId) {
+  let base = slugify(title) || 'product';
+  let finalSlug = base;
+  let n = 2;
+  while (true) {
+    const existing = db.prepare('SELECT id FROM store_products WHERE slug = ?').get(finalSlug);
+    if (!existing || existing.id === ignoreId) break;
+    finalSlug = `${base}-${n}`;
+    n++;
+  }
+  return finalSlug;
+}
+
+function getStoreAllPillPosition() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'store_all_pill_position'").get();
+  return row ? parseInt(row.value, 10) : 0;
+}
+
+function isStoreComingSoon() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'store_coming_soon'").get();
+  return !!row && row.value === '1';
+}
+
+function buildStorePillOrder(categories, allPosition) {
+  const merged = categories.map(c => ({ isAll: false, id: c.id, name: c.name, slug: c.slug }));
+  const clamped = Math.max(0, Math.min(allPosition, merged.length));
+  merged.splice(clamped, 0, { isAll: true, id: 'all', name: 'All' });
+  return merged;
+}
+
 function getAllPillPosition() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'all_pill_position'").get();
   return row ? parseInt(row.value, 10) : 0;
@@ -86,12 +136,17 @@ function uniqueArtworkSlug(title, ignoreId) {
 
 function dashboardData() {
   const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
+  const storeCategories = db.prepare('SELECT * FROM store_categories ORDER BY position ASC, name ASC').all();
   const unprotectedCount = db.prepare('SELECT COUNT(*) AS c FROM artworks WHERE original_path IS NULL').get().c
     + db.prepare('SELECT COUNT(*) AS c FROM artwork_images WHERE original_path IS NULL').get().c;
   return {
     artworks: getArtworksWithCategories(),
     categories,
     pillOrder: buildPillOrder(categories, getAllPillPosition()),
+    storeCategories,
+    storeProducts: getStoreProductsWithCategories(),
+    storePillOrder: buildStorePillOrder(storeCategories, getStoreAllPillPosition()),
+    storeComingSoon: isStoreComingSoon(),
     messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all(),
     posts: db.prepare('SELECT * FROM posts ORDER BY position ASC, published_at DESC').all(),
     unprotectedCount
@@ -624,6 +679,230 @@ router.post('/artworks/:id/move', requireAdmin, (req, res) => {
 });
 
 
+
+// ---------- Store (Printify-ready product categories) ----------
+
+router.post('/store-coming-soon', requireAdmin, (req, res) => {
+  const enabled = req.body.enabled === '1' ? '1' : '0';
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES ('store_coming_soon', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(enabled);
+  res.redirect('/admin');
+});
+
+router.post('/store-categories', requireAdmin, (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.render('admin/dashboard', { ...dashboardData(), error: 'Store category name is required.', success: null, page: 'admin' });
+  }
+
+  let slug = slugify(name);
+  if (!slug) {
+    return res.render('admin/dashboard', { ...dashboardData(), error: 'Please use a category name with letters or numbers.', success: null, page: 'admin' });
+  }
+
+  let finalSlug = slug;
+  let n = 2;
+  while (db.prepare('SELECT id FROM store_categories WHERE slug = ?').get(finalSlug)) {
+    finalSlug = `${slug}-${n}`;
+    n++;
+  }
+
+  const maxPos = db.prepare('SELECT MAX(position) AS m FROM store_categories').get().m;
+  const position = (maxPos === null ? 0 : maxPos + 1);
+
+  try {
+    db.prepare('INSERT INTO store_categories (name, slug, position) VALUES (?, ?, ?)').run(name.trim(), finalSlug, position);
+  } catch (err) {
+    return res.render('admin/dashboard', { ...dashboardData(), error: 'That store category already exists.', success: null, page: 'admin' });
+  }
+
+  res.redirect('/admin');
+});
+
+router.post('/store-categories/:id/delete', requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM store_categories WHERE id = ?').run(req.params.id);
+  res.redirect('/admin');
+});
+
+// Same important note as the art category reorder: must stay registered
+// before any generic '/store-categories/:id' route (none exists yet, but
+// keeping the same safe pattern for consistency and future-proofing).
+router.post('/store-categories/reorder', requireAdmin, (req, res) => {
+  const { orderedItems } = req.body;
+  if (!Array.isArray(orderedItems)) return res.status(400).json({ error: 'Invalid payload.' });
+
+  const allIndex = orderedItems.findIndex(item => item === 'all');
+  const categoryIds = orderedItems.filter(item => item !== 'all').map(id => parseInt(id, 10));
+
+  const update = db.prepare('UPDATE store_categories SET position = ? WHERE id = ?');
+  const tx = db.transaction((ids) => {
+    ids.forEach((id, index) => update.run(index, id));
+  });
+  tx(categoryIds);
+
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES ('store_all_pill_position', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(String(allIndex === -1 ? 0 : allIndex));
+
+  res.json({ ok: true });
+});
+
+router.post('/store-products', requireAdmin, withUploadErrorHandling(upload.single('image')), async (req, res) => {
+  const { title, description, sku, price } = req.body;
+  const categoryIds = normalizeCategoryIds(req.body.category_ids);
+
+  if (!title || !req.file) {
+    return res.render('admin/dashboard', {
+      ...dashboardData(), error: 'Title and image are required for a store product.', success: null, page: 'admin'
+    });
+  }
+
+  try {
+    const maxPos = db.prepare('SELECT MAX(position) AS m FROM store_products').get().m;
+    const position = (maxPos === null ? 0 : maxPos + 1);
+    const orientation = detectOrientation(req.file.path);
+    const { imagePath, originalFilename } = await splitUploadedFile(req.file);
+    const slug = uniqueStoreProductSlug(title.trim());
+
+    const result = db.prepare(`
+      INSERT INTO store_products (title, slug, sku, description, image_path, original_path, orientation, price, position, source)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+    `).run(
+      title.trim(),
+      slug,
+      (sku || '').trim(),
+      (description || '').trim(),
+      imagePath,
+      originalFilename,
+      orientation,
+      parseFloat(price) || 25.00,
+      position
+    );
+
+    if (categoryIds.length) setStoreProductCategories(result.lastInsertRowid, categoryIds);
+
+    res.redirect('/admin');
+  } catch (err) {
+    console.error('Error processing store product image:', err);
+    res.redirect('/admin?uploadError=' + encodeURIComponent('Could not process that image. Please try a different file.'));
+  }
+});
+
+router.get('/store-products/:id/edit', requireAdmin, (req, res) => {
+  const product = db.prepare('SELECT * FROM store_products WHERE id = ?').get(req.params.id);
+  if (!product) return res.redirect('/admin');
+
+  const storeCategories = db.prepare('SELECT * FROM store_categories ORDER BY position ASC, name ASC').all();
+  const selectedIds = db.prepare('SELECT category_id FROM store_product_categories WHERE product_id = ?')
+    .all(product.id).map(r => r.category_id);
+
+  res.render('admin/edit-store-product', { product, storeCategories, selectedIds, error: null, page: 'admin' });
+});
+
+// IMPORTANT: must stay registered before the generic '/store-products/:id' route.
+router.post('/store-products/reorder', requireAdmin, (req, res) => {
+  const { orderedIds } = req.body;
+  if (!Array.isArray(orderedIds)) return res.status(400).json({ error: 'Invalid payload.' });
+
+  const update = db.prepare('UPDATE store_products SET position = ? WHERE id = ?');
+  const tx = db.transaction((ids) => {
+    ids.forEach((id, index) => update.run(index, id));
+  });
+  tx(orderedIds);
+
+  res.json({ ok: true });
+});
+
+router.post('/store-products/:id', requireAdmin, withUploadErrorHandling(upload.single('image')), async (req, res) => {
+  const product = db.prepare('SELECT * FROM store_products WHERE id = ?').get(req.params.id);
+  if (!product) return res.redirect('/admin');
+
+  const { title, description, sku, price } = req.body;
+  const categoryIds = normalizeCategoryIds(req.body.category_ids);
+
+  if (!title || !title.trim()) {
+    const storeCategories = db.prepare('SELECT * FROM store_categories ORDER BY position ASC, name ASC').all();
+    return res.render('admin/edit-store-product', {
+      product, storeCategories, selectedIds: categoryIds, error: 'Title is required.', page: 'admin'
+    });
+  }
+
+  try {
+    let imagePath = product.image_path;
+    let originalPath = product.original_path;
+    let orientation = product.orientation;
+
+    if (req.file) {
+      orientation = detectOrientation(req.file.path);
+      const split = await splitUploadedFile(req.file);
+      imagePath = split.imagePath;
+      originalPath = split.originalFilename;
+
+      const oldPreview = path.join(__dirname, '..', 'data', 'uploads', path.basename(product.image_path));
+      fs.unlink(oldPreview, () => {});
+      if (product.original_path) {
+        fs.unlink(path.join(originalsDir, path.basename(product.original_path)), () => {});
+      }
+    }
+
+    const slug = title.trim() === product.title ? (product.slug || uniqueStoreProductSlug(title.trim(), product.id)) : uniqueStoreProductSlug(title.trim(), product.id);
+
+    db.prepare(`
+      UPDATE store_products
+      SET title = ?, slug = ?, sku = ?, description = ?, image_path = ?, original_path = ?, orientation = ?, price = ?
+      WHERE id = ?
+    `).run(
+      title.trim(),
+      slug,
+      (sku || '').trim(),
+      (description || '').trim(),
+      imagePath,
+      originalPath,
+      orientation,
+      parseFloat(price) || 25.00,
+      product.id
+    );
+
+    setStoreProductCategories(product.id, categoryIds);
+
+    res.redirect('/admin');
+  } catch (err) {
+    console.error('Error processing edited store product:', err);
+    res.redirect('/admin?uploadError=' + encodeURIComponent('Could not process that image. Please try a different file.'));
+  }
+});
+
+router.post('/store-products/:id/delete', requireAdmin, (req, res) => {
+  const product = db.prepare('SELECT * FROM store_products WHERE id = ?').get(req.params.id);
+  if (product) {
+    const filePath = path.join(__dirname, '..', 'data', 'uploads', path.basename(product.image_path));
+    fs.unlink(filePath, () => {});
+    if (product.original_path) {
+      fs.unlink(path.join(originalsDir, path.basename(product.original_path)), () => {});
+    }
+  }
+  db.prepare('DELETE FROM store_product_categories WHERE product_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM store_products WHERE id = ?').run(req.params.id);
+  res.redirect('/admin');
+});
+
+router.get('/store-products/:id/original', requireAdmin, (req, res) => {
+  const product = db.prepare('SELECT * FROM store_products WHERE id = ?').get(req.params.id);
+  if (!product) return res.redirect('/admin');
+
+  let filename = (product.original_path && product.original_path !== 'missing')
+    ? path.join(originalsDir, path.basename(product.original_path))
+    : path.join(__dirname, '..', 'data', 'uploads', path.basename(product.image_path));
+
+  if (!fs.existsSync(filename)) {
+    filename = path.join(__dirname, '..', 'data', 'uploads', path.basename(product.image_path));
+  }
+
+  res.download(filename, `${slugify(product.title) || 'product'}-original${path.extname(filename)}`);
+});
 
 // ---------- Blog posts ----------
 

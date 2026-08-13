@@ -88,6 +88,9 @@
     });
   })();
 
+  (function () {
+  if (!document.getElementById('buyModal')) return;
+
   const BULK_MIN_QTY = 10;
 
   const modal = document.getElementById('buyModal');
@@ -233,4 +236,88 @@
       checkoutBtn.textContent = 'Checkout with Stripe';
     }
   });
+  })();
+
+  // ---------- Store buy modal (simpler: just quantity, no retail/bulk toggle) ----------
+  (function () {
+    const storeModal = document.getElementById('storeBuyModal');
+    if (!storeModal) return;
+
+    const storeCloseBtn = document.getElementById('storeCloseModal');
+    const storeModalTitle = document.getElementById('storeModalTitle');
+    const storeQtyInput = document.getElementById('storeQtyInput');
+    const storeOrderTotal = document.getElementById('storeOrderTotal');
+    const storeModalError = document.getElementById('storeModalError');
+    const storeCheckoutBtn = document.getElementById('storeCheckoutBtn');
+
+    let storeCurrent = null;
+
+    function storeRecalc() {
+      const qty = parseInt(storeQtyInput.value, 10) || 0;
+      const total = storeCurrent ? storeCurrent.price * Math.max(qty, 0) : 0;
+      storeOrderTotal.textContent = '$' + total.toFixed(2);
+    }
+
+    function storeOpenModal(data) {
+      storeCurrent = data;
+      storeQtyInput.value = 1;
+      storeModalError.classList.add('hidden');
+      storeModalTitle.textContent = data.title;
+      storeRecalc();
+      storeModal.classList.add('open');
+    }
+
+    function storeCloseModal() {
+      storeModal.classList.remove('open');
+      storeCurrent = null;
+    }
+
+    document.querySelectorAll('.js-open-store-buy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        storeOpenModal({
+          id: btn.dataset.id,
+          title: btn.dataset.title,
+          price: parseFloat(btn.dataset.price)
+        });
+      });
+    });
+
+    storeCloseBtn.addEventListener('click', storeCloseModal);
+    storeModal.addEventListener('click', (e) => { if (e.target === storeModal) storeCloseModal(); });
+    storeQtyInput.addEventListener('input', storeRecalc);
+
+    storeCheckoutBtn.addEventListener('click', async () => {
+      if (!storeCurrent) return;
+      const qty = parseInt(storeQtyInput.value, 10) || 0;
+
+      if (qty < 1) {
+        storeModalError.textContent = 'Please enter a valid quantity.';
+        storeModalError.classList.remove('hidden');
+        return;
+      }
+
+      storeModalError.classList.add('hidden');
+      storeCheckoutBtn.disabled = true;
+      storeCheckoutBtn.textContent = 'Redirecting…';
+
+      try {
+        const res = await fetch('/api/store-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: storeCurrent.id,
+            quantity: qty
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+        window.location.href = data.url;
+      } catch (err) {
+        storeModalError.textContent = err.message;
+        storeModalError.classList.remove('hidden');
+        storeCheckoutBtn.disabled = false;
+        storeCheckoutBtn.textContent = 'Checkout with Stripe';
+      }
+    });
+  })();
 })();

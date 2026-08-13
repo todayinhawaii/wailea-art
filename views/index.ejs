@@ -17,7 +17,7 @@
 </section>
 
 <main class="wrap">
-  <% if (categories.length > 0) { %>
+  <% if (categories.length > 0 || hasStoreProducts) { %>
     <div class="category-pills">
       <% pillOrder.forEach(function(item) { %>
         <% if (item.isAll) { %>
@@ -26,6 +26,9 @@
           <a href="/?category=<%= item.slug %>" class="pill <%= activeSlug === item.slug ? 'active' : '' %>"><%= item.name %></a>
         <% } %>
       <% }); %>
+      <% if (hasStoreProducts) { %>
+        <a href="/store" class="pill pill-store">Our Store</a>
+      <% } %>
     </div>
   <% } %>
 

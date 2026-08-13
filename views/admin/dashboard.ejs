@@ -319,6 +319,144 @@
           </div>
         <% } %>
       </div>
+
+      <div class="admin-card" style="background: <%= storeComingSoon ? '#fdf6e3' : 'var(--card)' %>; <%= storeComingSoon ? 'border-color: #e8d9a8;' : '' %>">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="margin:0;">Store status</h3>
+            <p style="color: var(--ink-soft); font-size: 0.85rem; margin: 4px 0 0;">
+              <% if (storeComingSoon) { %>
+                Your "Our Store" page currently shows a friendly "coming soon" message to visitors instead of your products.
+              <% } else { %>
+                Your "Our Store" page is showing your live products to visitors right now.
+              <% } %>
+            </p>
+          </div>
+          <form method="POST" action="/admin/store-coming-soon">
+            <input type="hidden" name="enabled" value="<%= storeComingSoon ? '0' : '1' %>">
+            <button class="btn <%= storeComingSoon ? 'btn-primary' : 'btn-secondary' %> btn-sm" type="submit">
+              <%= storeComingSoon ? 'Turn off Coming Soon' : 'Turn on Coming Soon' %>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Add store product</h3>
+        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">Lives on your separate "Our Store" page, apart from your art gallery.</p>
+        <form method="POST" action="/admin/store-products" enctype="multipart/form-data" class="stack">
+          <div class="field-group">
+            <label for="sp_title">Title</label>
+            <input type="text" id="sp_title" name="title" required>
+          </div>
+          <div class="field-group">
+            <label for="sp_sku">Internal reference / SKU (optional — only you see this)</label>
+            <input type="text" id="sp_sku" name="sku" placeholder="e.g. Printify #1234">
+          </div>
+          <div class="field-group">
+            <label for="sp_description">Description (optional)</label>
+            <textarea id="sp_description" name="description" rows="3"></textarea>
+          </div>
+          <div class="field-group">
+            <label for="sp_price">Price</label>
+            <input type="number" step="0.01" id="sp_price" name="price" value="25.00">
+          </div>
+          <div class="field-group">
+            <label for="sp_image">Image (JPG, PNG, or WEBP)</label>
+            <input type="file" id="sp_image" name="image" accept="image/jpeg,image/png,image/webp" required>
+          </div>
+
+          <% if (storeCategories.length > 0) { %>
+            <div class="field-group">
+              <label>Store categories (optional, choose any that apply)</label>
+              <div class="checkbox-grid">
+                <% storeCategories.forEach(function(cat) { %>
+                  <label class="checkbox-pill">
+                    <input type="checkbox" name="category_ids" value="<%= cat.id %>">
+                    <span><%= cat.name %></span>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          <% } %>
+
+          <button class="btn btn-primary btn-block" type="submit">Add store product</button>
+        </form>
+      </div>
+
+      <div class="admin-card">
+        <h3>Store categories</h3>
+        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">These show as pills at the top of your "Our Store" page — separate from your art categories.</p>
+
+        <ul class="sortable-list" id="storeCategorySortableList">
+          <% storePillOrder.forEach(function(item) { %>
+            <li class="sortable-item" draggable="true" data-id="<%= item.id %>">
+              <span class="drag-handle">&#8942;&#8942;</span>
+              <span class="item-title"><%= item.isAll ? 'All' : item.name %><% if (item.isAll) { %> <span style="color:var(--ink-soft); font-size:0.78rem;">(shows every product)</span><% } %></span>
+              <% if (!item.isAll) { %>
+                <div class="item-actions">
+                  <form method="POST" action="/admin/store-categories/<%= item.id %>/delete" onsubmit="return confirm('Delete this store category? It will be removed from any product using it.');">
+                    <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                  </form>
+                </div>
+              <% } %>
+            </li>
+          <% }); %>
+        </ul>
+        <div style="display:flex; align-items:center; gap:14px; margin-top:14px;">
+          <button class="btn btn-primary" type="button" id="saveStoreCategoryOrderBtn">Save order</button>
+          <span id="storeCategoryOrderSaveStatus" style="font-size:0.85rem; opacity:0; transition:opacity 0.3s ease;"></span>
+        </div>
+
+        <form method="POST" action="/admin/store-categories" class="stack" style="margin-top:20px;">
+          <div class="field-group" style="display:flex; gap:10px; margin:0; align-items:flex-end;">
+            <div style="flex:1;">
+              <label for="store_cat_name">New store category name</label>
+              <input type="text" id="store_cat_name" name="name" placeholder="e.g. Towels" required>
+            </div>
+            <button class="btn btn-secondary" type="submit">Add</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="admin-card">
+        <h3>Store product order</h3>
+        <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">Drag products to reorder. Top of the list shows first on your "Our Store" page.</p>
+
+        <% if (storeProducts.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No store products yet — add your first one above.</p>
+        <% } else { %>
+          <ul class="sortable-list" id="storeProductSortableList">
+            <% storeProducts.forEach(function(sp) { %>
+              <li class="sortable-item" draggable="true" data-id="<%= sp.id %>">
+                <span class="drag-handle">&#8942;&#8942;</span>
+                <img src="<%= sp.image_path %>" alt="<%= sp.title %>">
+                <div class="item-title">
+                  <div><%= sp.title %><% if (sp.sku) { %> <span style="color:var(--ocean); font-size:0.78rem; font-weight:normal;">(<%= sp.sku %>)</span><% } %></div>
+                  <div style="font-size:0.76rem; color:var(--ink-soft);">
+                    $<%= sp.price.toFixed(2) %>
+                    <% if (sp.categories && sp.categories.length) { %>
+                      &middot; <%= sp.categories.map(c => c.name).join(', ') %>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="item-actions">
+                  <a class="btn btn-secondary btn-sm" href="/admin/store-products/<%= sp.id %>/edit">Edit</a>
+                  <button class="btn btn-secondary btn-sm move-top-btn" type="button">To top</button>
+                  <button class="btn btn-secondary btn-sm move-bottom-btn" type="button">To bottom</button>
+                  <form method="POST" action="/admin/store-products/<%= sp.id %>/delete" onsubmit="return confirm('Delete this store product? This cannot be undone.');">
+                    <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                  </form>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <div style="display:flex; align-items:center; gap:14px; margin-top:14px;">
+            <button class="btn btn-primary" type="button" id="saveStoreProductOrderBtn">Save order</button>
+            <span id="storeProductOrderSaveStatus" style="font-size:0.85rem; opacity:0; transition:opacity 0.3s ease;"></span>
+          </div>
+        <% } %>
+      </div>
     </div>
   </div>
 </main>

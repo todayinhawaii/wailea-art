@@ -52,6 +52,35 @@ db.exec(`
     PRIMARY KEY (artwork_id, category_id)
   );
 
+  CREATE TABLE IF NOT EXISTS store_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    slug TEXT NOT NULL UNIQUE,
+    position REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS store_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    slug TEXT,
+    sku TEXT,
+    description TEXT NOT NULL DEFAULT '',
+    image_path TEXT NOT NULL,
+    original_path TEXT,
+    orientation TEXT NOT NULL DEFAULT 'portrait',
+    price REAL NOT NULL DEFAULT 25.00,
+    position REAL NOT NULL DEFAULT 0,
+    source TEXT NOT NULL DEFAULT 'manual',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS store_product_categories (
+    product_id INTEGER NOT NULL REFERENCES store_products(id) ON DELETE CASCADE,
+    category_id INTEGER NOT NULL REFERENCES store_categories(id) ON DELETE CASCADE,
+    PRIMARY KEY (product_id, category_id)
+  );
+
   CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,

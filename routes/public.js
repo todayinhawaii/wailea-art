@@ -94,7 +94,8 @@ const SHIPPABLE_COUNTRIES = [
 const SHIPPING_RATES = {
   retail: 6.95,
   bulk: 24.95,
-  canvas: 14.95
+  canvas: 14.95,
+  store: 6.95
 };
 
 router.get('/sitemap.xml', (req, res) => {
@@ -156,7 +157,47 @@ router.get('/', (req, res) => {
     images: [a.image_path, ...extraImagesStmt.all(a.id).map(r => r.image_path)]
   }));
 
-  res.render('index', { artworks, categories, pillOrder, activeSlug, bulkMinQty: BULK_MIN_QTY, page: 'home' });
+  const hasStoreProducts = db.prepare('SELECT COUNT(*) AS c FROM store_products').get().c > 0;
+  const storeComingSoonRow = db.prepare("SELECT value FROM settings WHERE key = 'store_coming_soon'").get();
+  const storeComingSoon = !!storeComingSoonRow && storeComingSoonRow.value === '1';
+  const showStorePill = hasStoreProducts || storeComingSoon;
+
+  res.render('index', { artworks, categories, pillOrder, activeSlug, hasStoreProducts: showStorePill, bulkMinQty: BULK_MIN_QTY, page: 'home' });
+});
+
+router.get('/store', (req, res) => {
+  const storeComingSoonRow = db.prepare("SELECT value FROM settings WHERE key = 'store_coming_soon'").get();
+  const storeComingSoon = !!storeComingSoonRow && storeComingSoonRow.value === '1';
+
+  if (storeComingSoon) {
+    return res.render('store', {
+      storeProducts: [], storeCategories: [], pillOrder: [], activeSlug: null, storeComingSoon: true, page: 'store'
+    });
+  }
+
+  const storeCategories = db.prepare('SELECT * FROM store_categories ORDER BY position ASC, name ASC').all();
+  const activeSlug = req.query.category || null;
+
+  const allPositionRow = db.prepare("SELECT value FROM settings WHERE key = 'store_all_pill_position'").get();
+  const allPosition = allPositionRow ? parseInt(allPositionRow.value, 10) : 0;
+  const pillOrder = storeCategories.map(c => ({ isAll: false, slug: c.slug, name: c.name }));
+  const clampedAllPos = Math.max(0, Math.min(allPosition, pillOrder.length));
+  pillOrder.splice(clampedAllPos, 0, { isAll: true, slug: null, name: 'All' });
+
+  let storeProducts;
+  if (activeSlug) {
+    storeProducts = db.prepare(`
+      SELECT DISTINCT p.* FROM store_products p
+      JOIN store_product_categories pc ON pc.product_id = p.id
+      JOIN store_categories c ON c.id = pc.category_id
+      WHERE c.slug = ?
+      ORDER BY p.position ASC
+    `).all(activeSlug);
+  } else {
+    storeProducts = db.prepare('SELECT * FROM store_products ORDER BY position ASC').all();
+  }
+
+  res.render('store', { storeProducts, storeCategories, pillOrder, activeSlug, storeComingSoon: false, page: 'store' });
 });
 
 router.get('/art/:slug', (req, res, next) => {
@@ -283,6 +324,71 @@ router.post('/api/checkout', async (req, res) => {
     res.json({ url: session.url });
   } catch (err) {
     console.error('Checkout error:', err);
+    res.status(500).json({ error: 'Something went wrong creating your checkout session.' });
+  }
+});
+
+router.post('/api/store-checkout', async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Payments are not configured yet. Add STRIPE_SECRET_KEY.' });
+    }
+
+    const { productId, quantity } = req.body;
+    const product = db.prepare('SELECT * FROM store_products WHERE id = ?').get(productId);
+    if (!product) return res.status(404).json({ error: 'Product not found.' });
+
+    const qty = parseInt(quantity, 10);
+    if (!Number.isInteger(qty) || qty < 1) {
+      return res.status(400).json({ error: 'Please enter a valid quantity.' });
+    }
+
+    const siteUrl = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          quantity: qty,
+          price_data: {
+            currency: 'usd',
+            unit_amount: Math.round(product.price * 100),
+            product_data: {
+              name: product.title,
+              description: product.description || 'Wailea Art store item',
+              images: product.image_path.startsWith('http')
+                ? [product.image_path]
+                : [`${siteUrl}${product.image_path}`]
+            }
+          }
+        }
+      ],
+      shipping_address_collection: {
+        allowed_countries: SHIPPABLE_COUNTRIES
+      },
+      shipping_options: [
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: {
+              amount: Math.round(SHIPPING_RATES.store * 100),
+              currency: 'usd'
+            },
+            display_name: 'Standard shipping'
+          }
+        }
+      ],
+      phone_number_collection: {
+        enabled: true
+      },
+      success_url: `${siteUrl}/checkout/success`,
+      cancel_url: `${siteUrl}/checkout/cancel`
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Store checkout error:', err);
     res.status(500).json({ error: 'Something went wrong creating your checkout session.' });
   }
 });

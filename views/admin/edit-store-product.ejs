@@ -1,0 +1,64 @@
+<% pageTitle = 'Edit store product — Wailea Art' %>
+<% noIndex = true %>
+<%- include('../partials/header') %>
+
+<main class="wrap admin-shell">
+  <div class="admin-header">
+    <h1 style="margin:0;">Edit store product</h1>
+    <a class="btn btn-secondary btn-sm" href="/admin">Back to admin</a>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <div class="admin-card" style="max-width: 560px;">
+    <div style="margin-bottom: 18px;">
+      <img src="<%= product.image_path %>" alt="<%= product.title %>" style="max-width: 160px; border-radius: 3px; border: 1px solid var(--sand-line);">
+      <div style="margin-top: 8px;">
+        <a class="btn btn-secondary btn-sm" href="/admin/store-products/<%= product.id %>/original">Download original (full resolution)</a>
+      </div>
+    </div>
+
+    <form method="POST" action="/admin/store-products/<%= product.id %>" enctype="multipart/form-data" class="stack">
+      <div class="field-group">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" value="<%= product.title %>" required>
+      </div>
+      <div class="field-group">
+        <label for="sku">Internal reference / SKU (optional — only you see this, never shown publicly)</label>
+        <input type="text" id="sku" name="sku" value="<%= product.sku || '' %>" placeholder="e.g. Printify #1234">
+      </div>
+      <div class="field-group">
+        <label for="description">Description (optional)</label>
+        <textarea id="description" name="description" rows="3"><%= product.description %></textarea>
+      </div>
+      <div class="field-group">
+        <label for="price">Price</label>
+        <input type="number" step="0.01" id="price" name="price" value="<%= product.price %>">
+      </div>
+      <div class="field-group">
+        <label for="image">Replace main image (optional — leave blank to keep current image)</label>
+        <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp">
+      </div>
+
+      <% if (storeCategories.length > 0) { %>
+        <div class="field-group">
+          <label>Store categories</label>
+          <div class="checkbox-grid">
+            <% storeCategories.forEach(function(cat) { %>
+              <label class="checkbox-pill">
+                <input type="checkbox" name="category_ids" value="<%= cat.id %>" <%= selectedIds.includes(cat.id) ? 'checked' : '' %>>
+                <span><%= cat.name %></span>
+              </label>
+            <% }); %>
+          </div>
+        </div>
+      <% } %>
+
+      <button class="btn btn-primary btn-block" type="submit">Save changes</button>
+    </form>
+  </div>
+</main>
+
+<%- include('../partials/site-footer') %>
