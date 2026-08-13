@@ -151,7 +151,11 @@ function dashboardData() {
     printifyShopTitle: (db.prepare("SELECT value FROM settings WHERE key = 'printify_shop_title'").get() || {}).value || '',
     printifyConfigured: printify.isConfigured(),
     printifyPendingCount: db.prepare("SELECT COUNT(*) AS c FROM store_products WHERE source = 'printify' AND published = 0").get().c,
-    printifyPendingProducts: db.prepare("SELECT * FROM store_products WHERE source = 'printify' AND published = 0 ORDER BY id DESC").all(),
+    printifyPendingProducts: db.prepare("SELECT * FROM store_products WHERE source = 'printify' AND published = 0 ORDER BY id DESC").all()
+      .map(p => ({
+        ...p,
+        selectedCategoryIds: db.prepare('SELECT category_id FROM store_product_categories WHERE product_id = ?').all(p.id).map(r => r.category_id)
+      })),
     messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all(),
     posts: db.prepare('SELECT * FROM posts ORDER BY position ASC, published_at DESC').all(),
     unprotectedCount
@@ -788,6 +792,8 @@ router.post('/printify/sync', requireAdmin, async (req, res) => {
 });
 
 router.post('/store-products/:id/publish', requireAdmin, (req, res) => {
+  const categoryIds = normalizeCategoryIds(req.body.category_ids);
+  if (categoryIds.length) setStoreProductCategories(req.params.id, categoryIds);
   db.prepare('UPDATE store_products SET published = 1 WHERE id = ?').run(req.params.id);
   res.redirect('/admin');
 });

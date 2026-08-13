@@ -348,17 +348,29 @@
             <div style="margin-top: 20px; border-top: 1px solid var(--sand-line); padding-top: 16px;">
               <h4 style="margin: 0 0 10px; font-size: 0.95rem;">Waiting for your review</h4>
               <% printifyPendingProducts.forEach(function(pp) { %>
-                <div style="display:flex; align-items:center; gap:12px; padding: 8px 0; border-bottom: 1px solid var(--sand-line);">
+                <form method="POST" action="/admin/store-products/<%= pp.id %>/publish" style="display:flex; align-items:center; gap:12px; padding: 10px 0; border-bottom: 1px solid var(--sand-line); flex-wrap: wrap;">
                   <img src="<%= pp.image_path %>" alt="<%= pp.title %>" style="width:44px; height:56px; object-fit:cover; border-radius:2px; border:1px solid var(--sand-line);">
-                  <div style="flex:1;">
+                  <div style="flex:1; min-width: 140px;">
                     <div><%= pp.title %></div>
                     <div style="font-size:0.78rem; color:var(--ink-soft);">$<%= pp.price.toFixed(2) %></div>
                   </div>
+
+                  <% if (storeCategories.length > 0) { %>
+                    <div style="display:flex; gap:6px; flex-wrap: wrap; max-width: 320px;">
+                      <% storeCategories.forEach(function(cat) { %>
+                        <label class="checkbox-pill" style="font-size: 0.78rem; padding: 4px 10px;">
+                          <input type="checkbox" name="category_ids" value="<%= cat.id %>" <%= pp.selectedCategoryIds.includes(cat.id) ? 'checked' : '' %>>
+                          <span><%= cat.name %></span>
+                        </label>
+                      <% }); %>
+                    </div>
+                  <% } else { %>
+                    <span style="font-size: 0.78rem; color: var(--ink-soft);">No categories yet — add one below, optional.</span>
+                  <% } %>
+
                   <a class="btn btn-secondary btn-sm" href="/admin/store-products/<%= pp.id %>/edit">Edit</a>
-                  <form method="POST" action="/admin/store-products/<%= pp.id %>/publish">
-                    <button class="btn btn-primary btn-sm" type="submit">Publish</button>
-                  </form>
-                </div>
+                  <button class="btn btn-primary btn-sm" type="submit">Publish</button>
+                </form>
               <% }); %>
             </div>
           <% } %>
