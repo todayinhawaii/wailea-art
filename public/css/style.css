@@ -686,7 +686,7 @@ form.stack .field-group { margin: 0 0 16px; }
 .sortable-list { list-style: none; margin: 0; padding: 0; }
 .sortable-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   padding: 12px;
   border: 1px solid var(--sand-line);

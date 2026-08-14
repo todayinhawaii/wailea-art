@@ -148,11 +148,27 @@ function uniqueArtworkSlug(title, ignoreId) {
   return finalSlug;
 }
 
-function dashboardData() {
+function dashboardData(options = {}) {
+  const pendingSearch = (options.pendingSearch || '').trim();
+  const pendingPage = Math.max(1, parseInt(options.pendingPage, 10) || 1);
+  const pendingPerPage = 25;
+
   const categories = db.prepare('SELECT * FROM categories ORDER BY position ASC, name ASC').all();
   const storeCategories = db.prepare('SELECT * FROM store_categories ORDER BY position ASC, name ASC').all();
   const unprotectedCount = db.prepare('SELECT COUNT(*) AS c FROM artworks WHERE original_path IS NULL').get().c
     + db.prepare('SELECT COUNT(*) AS c FROM artwork_images WHERE original_path IS NULL').get().c;
+
+  const searchClause = pendingSearch ? "AND title LIKE ?" : "";
+  const searchParam = pendingSearch ? [`%${pendingSearch}%`] : [];
+
+  const printifyPendingCount = db.prepare("SELECT COUNT(*) AS c FROM store_products WHERE source = 'printify' AND published = 0").get().c;
+  const printifyPendingFilteredCount = db.prepare(
+    `SELECT COUNT(*) AS c FROM store_products WHERE source = 'printify' AND published = 0 ${searchClause}`
+  ).get(...searchParam).c;
+  const totalPendingPages = Math.max(1, Math.ceil(printifyPendingFilteredCount / pendingPerPage));
+  const clampedPage = Math.min(pendingPage, totalPendingPages);
+  const offset = (clampedPage - 1) * pendingPerPage;
+
   return {
     artworks: getArtworksWithCategories(),
     categories,
@@ -164,8 +180,14 @@ function dashboardData() {
     printifyConnected: !!db.prepare("SELECT value FROM settings WHERE key = 'printify_shop_id'").get(),
     printifyShopTitle: (db.prepare("SELECT value FROM settings WHERE key = 'printify_shop_title'").get() || {}).value || '',
     printifyConfigured: printify.isConfigured(),
-    printifyPendingCount: db.prepare("SELECT COUNT(*) AS c FROM store_products WHERE source = 'printify' AND published = 0").get().c,
-    printifyPendingProducts: db.prepare("SELECT * FROM store_products WHERE source = 'printify' AND published = 0 ORDER BY id DESC LIMIT 25").all()
+    printifyPendingCount,
+    printifyPendingFilteredCount,
+    pendingSearch,
+    pendingPage: clampedPage,
+    totalPendingPages,
+    printifyPendingProducts: db.prepare(
+      `SELECT * FROM store_products WHERE source = 'printify' AND published = 0 ${searchClause} ORDER BY id DESC LIMIT ? OFFSET ?`
+    ).all(...searchParam, pendingPerPage, offset)
       .map(p => ({
         ...p,
         selectedCategoryIds: db.prepare('SELECT category_id FROM store_product_categories WHERE product_id = ?').all(p.id).map(r => r.category_id)
@@ -230,7 +252,10 @@ router.get('/', requireAdmin, (req, res) => {
 
   const uploadError = req.query.uploadError ? decodeURIComponent(req.query.uploadError) : null;
 
-  res.render('admin/dashboard', { ...dashboardData(), error: uploadError, success, autoContinueProtection, page: 'admin' });
+  res.render('admin/dashboard', {
+    ...dashboardData({ pendingSearch: req.query.pendingSearch, pendingPage: req.query.pendingPage }),
+    error: uploadError, success, autoContinueProtection, page: 'admin'
+  });
 });
 
 // ---------- Categories ----------
@@ -967,15 +992,30 @@ router.post('/store-products/reorder', requireAdmin, (req, res) => {
 });
 
 // IMPORTANT: must stay registered before the generic '/store-products/:id' route.
+// IMPORTANT: must stay registered before the generic '/store-products/:id' route.
+router.post('/store-products/:id/categories', requireAdmin, (req, res) => {
+  const categoryIds = normalizeCategoryIds(req.body.category_ids);
+  setStoreProductCategories(req.params.id, categoryIds);
+  res.redirect('/admin');
+});
+
 router.post('/store-products/bulk-publish', requireAdmin, (req, res) => {
-  const { ids, selectAllPending, categoryId } = req.body;
+  const { ids, selectAllPending, categoryId, search } = req.body;
 
   let targetIds;
   if (selectAllPending) {
-    // Operate on every pending Printify product, not just the ones
-    // currently rendered on the page — this is what makes it possible to
-    // publish hundreds of synced products without scrolling through them.
-    targetIds = db.prepare("SELECT id FROM store_products WHERE source = 'printify' AND published = 0").all().map(r => r.id);
+    // Operate on every pending Printify product matching the current
+    // search (or all of them, if no search is active) — not just the ones
+    // currently rendered on the page. This is what makes it possible to
+    // publish hundreds of synced products without scrolling through them,
+    // while still respecting a search like "jigsaw" if one is in use.
+    const trimmedSearch = (search || '').trim();
+    if (trimmedSearch) {
+      targetIds = db.prepare("SELECT id FROM store_products WHERE source = 'printify' AND published = 0 AND title LIKE ?")
+        .all(`%${trimmedSearch}%`).map(r => r.id);
+    } else {
+      targetIds = db.prepare("SELECT id FROM store_products WHERE source = 'printify' AND published = 0").all().map(r => r.id);
+    }
   } else if (Array.isArray(ids)) {
     targetIds = ids.map(id => parseInt(id, 10)).filter(Number.isInteger);
   } else {

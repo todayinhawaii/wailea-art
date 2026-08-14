@@ -374,7 +374,8 @@
     const countEl = document.getElementById('bulkPublishCount');
     const statusEl = document.getElementById('bulkPublishStatus');
     const categorySelect = document.getElementById('bulkPublishCategory');
-    const totalPendingCount = parseInt(selectAllPending.parentElement.textContent.match(/\d+/)[0], 10) || 0;
+    const totalPendingCount = parseInt(selectAllPending.dataset.total, 10) || 0;
+    const activeSearch = selectAllPending.dataset.search || '';
 
     function visibleCheckboxes() {
       return [...document.querySelectorAll('.pending-printify-checkbox')];
@@ -425,6 +426,7 @@
           body: JSON.stringify({
             ids: usingSelectAll ? undefined : ids,
             selectAllPending: usingSelectAll,
+            search: usingSelectAll ? activeSearch : undefined,
             categoryId: categoryId || null
           })
         });

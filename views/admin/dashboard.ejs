@@ -299,16 +299,27 @@
           </div>
 
           <% if (printifyPendingCount > 0) { %>
-            <div style="margin-top: 20px; border-top: 1px solid var(--sand-line); padding-top: 16px;">
+            <div id="printify-pending" style="margin-top: 20px; border-top: 1px solid var(--sand-line); padding-top: 16px;">
               <h4 style="margin: 0 0 4px; font-size: 0.95rem;">Waiting for your review (<%= printifyPendingCount %> total)</h4>
-              <% if (printifyPendingCount > printifyPendingProducts.length) { %>
-                <p style="font-size: 0.8rem; color: var(--ink-soft); margin: 0 0 12px;">Showing the most recent <%= printifyPendingProducts.length %> — use "Select all pending" below to act on all <%= printifyPendingCount %> at once, no scrolling required.</p>
+
+              <form method="GET" action="/admin" style="display:flex; gap:8px; margin: 10px 0;">
+                <input type="text" name="pendingSearch" value="<%= pendingSearch %>" placeholder="Search pending products, e.g. jigsaw" style="flex:1; padding:7px 10px; border-radius:4px; border:1px solid var(--sand-line); font-size:0.85rem;">
+                <button class="btn btn-secondary btn-sm" type="submit">Search</button>
+                <% if (pendingSearch) { %>
+                  <a class="btn btn-secondary btn-sm" href="/admin">Clear</a>
+                <% } %>
+              </form>
+
+              <% if (pendingSearch) { %>
+                <p style="font-size: 0.8rem; color: var(--ink-soft); margin: 0 0 12px;"><%= printifyPendingFilteredCount %> product<%= printifyPendingFilteredCount === 1 ? '' : 's' %> match "<%= pendingSearch %>".</p>
+              <% } else if (printifyPendingCount > printifyPendingProducts.length) { %>
+                <p style="font-size: 0.8rem; color: var(--ink-soft); margin: 0 0 12px;">Page <%= pendingPage %> of <%= totalPendingPages %> — use "Select all pending" below to act on everything at once, no scrolling or paging required.</p>
               <% } %>
 
               <div style="background: var(--sand); border: 1px solid var(--sand-line); border-radius: var(--radius); padding: 12px; margin-bottom: 16px;">
                 <label class="checkbox-pill" style="width: fit-content; margin-bottom: 10px;">
-                  <input type="checkbox" id="selectAllPendingPrintify">
-                  <span>Select all <%= printifyPendingCount %> pending products</span>
+                  <input type="checkbox" id="selectAllPendingPrintify" data-total="<%= printifyPendingFilteredCount %>" data-search="<%= pendingSearch %>">
+                  <span><% if (pendingSearch) { %>Select all <%= printifyPendingFilteredCount %> matching "<%= pendingSearch %>"<% } else { %>Select all <%= printifyPendingCount %> pending products<% } %></span>
                 </label>
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap: wrap;">
                   <% if (storeCategories.length > 0) { %>
@@ -349,6 +360,17 @@
                   </form>
                 </div>
               <% }); %>
+
+              <% if (totalPendingPages > 1) { %>
+                <div style="display:flex; gap:6px; flex-wrap: wrap; margin-top: 16px; align-items:center;">
+                  <% for (let n = 1; n <= totalPendingPages; n++) { %>
+                    <a class="btn btn-sm <%= n === pendingPage ? 'btn-primary' : 'btn-secondary' %>"
+                       href="/admin?pendingPage=<%= n %><%= pendingSearch ? '&pendingSearch=' + encodeURIComponent(pendingSearch) : '' %>#printify-pending">
+                      <%= n %>
+                    </a>
+                  <% } %>
+                </div>
+              <% } %>
             </div>
           <% } %>
         <% } %>
@@ -462,17 +484,28 @@
         <% } else { %>
           <ul class="sortable-list" id="storeProductSortableList">
             <% storeProducts.forEach(function(sp) { %>
-              <li class="sortable-item" draggable="true" data-id="<%= sp.id %>">
+              <li class="sortable-item" draggable="true" data-id="<%= sp.id %>" style="flex-wrap: wrap;">
                 <span class="drag-handle">&#8942;&#8942;</span>
                 <img src="<%= sp.image_path %>" alt="<%= sp.title %>">
                 <div class="item-title">
                   <div><%= sp.title %><% if (sp.sku) { %> <span style="color:var(--ocean); font-size:0.78rem; font-weight:normal;">(<%= sp.sku %>)</span><% } %></div>
                   <div style="font-size:0.76rem; color:var(--ink-soft);">
                     $<%= sp.price.toFixed(2) %>
-                    <% if (sp.categories && sp.categories.length) { %>
-                      &middot; <%= sp.categories.map(c => c.name).join(', ') %>
+                    <% if (!sp.categories || sp.categories.length === 0) { %>
+                      <span style="color:#b5451b; font-weight:bold;">⚠️ No category — only shows under "All"</span>
                     <% } %>
                   </div>
+                  <% if (storeCategories.length > 0) { %>
+                    <form method="POST" action="/admin/store-products/<%= sp.id %>/categories" style="display:flex; align-items:center; gap:6px; flex-wrap: wrap; margin-top:6px;">
+                      <% storeCategories.forEach(function(cat) { %>
+                        <label class="checkbox-pill" style="font-size: 0.76rem; padding: 3px 8px;">
+                          <input type="checkbox" name="category_ids" value="<%= cat.id %>" <%= (sp.categories || []).some(c => c.id === cat.id) ? 'checked' : '' %>>
+                          <span><%= cat.name %></span>
+                        </label>
+                      <% }); %>
+                      <button class="btn btn-secondary btn-sm" type="submit" style="font-size:0.76rem; padding: 3px 10px;">Save categories</button>
+                    </form>
+                  <% } %>
                 </div>
                 <div class="item-actions">
                   <a class="btn btn-secondary btn-sm" href="/admin/store-products/<%= sp.id %>/edit">Edit</a>
