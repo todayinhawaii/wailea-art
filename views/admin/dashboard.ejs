@@ -476,11 +476,21 @@
       </div>
 
       <div class="admin-card">
-        <h3>Store product order</h3>
+        <h3 id="store-product-order">Store product order</h3>
         <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">Drag products to reorder. Top of the list shows first on your "Our Store" page.</p>
 
+        <% if (uncategorizedStoreCount > 0) { %>
+          <div style="margin-bottom: 14px;">
+            <% if (storeFilter === 'uncategorized') { %>
+              <a href="/admin#store-product-order" class="btn btn-secondary btn-sm">← Show all products</a>
+            <% } else { %>
+              <a href="/admin?storeFilter=uncategorized#store-product-order" class="btn btn-secondary btn-sm">⚠️ Show only uncategorized (<%= uncategorizedStoreCount %>)</a>
+            <% } %>
+          </div>
+        <% } %>
+
         <% if (storeProducts.length === 0) { %>
-          <p style="color: var(--ink-soft); font-size: 0.9rem;">No store products yet — add your first one above.</p>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;"><% if (storeFilter === 'uncategorized') { %>No uncategorized products — everything's sorted.<% } else { %>No store products yet — add your first one above.<% } %></p>
         <% } else { %>
           <ul class="sortable-list" id="storeProductSortableList">
             <% storeProducts.forEach(function(sp) { %>

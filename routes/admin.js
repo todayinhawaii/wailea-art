@@ -73,8 +73,14 @@ function getArtworksWithCategories() {
   return artworks.map(a => ({ ...a, categories: catStmt.all(a.id) }));
 }
 
-function getStoreProductsWithCategories() {
-  const products = db.prepare('SELECT * FROM store_products ORDER BY position ASC').all();
+function getStoreProductsWithCategories(filter) {
+  const products = filter === 'uncategorized'
+    ? db.prepare(`
+        SELECT * FROM store_products
+        WHERE id NOT IN (SELECT DISTINCT product_id FROM store_product_categories)
+        ORDER BY position ASC
+      `).all()
+    : db.prepare('SELECT * FROM store_products ORDER BY position ASC').all();
   const catStmt = db.prepare(`
     SELECT c.id, c.name FROM store_categories c
     JOIN store_product_categories pc ON pc.category_id = c.id
@@ -174,7 +180,12 @@ function dashboardData(options = {}) {
     categories,
     pillOrder: buildPillOrder(categories, getAllPillPosition()),
     storeCategories,
-    storeProducts: getStoreProductsWithCategories(),
+    storeProducts: getStoreProductsWithCategories(options.storeFilter),
+    storeFilter: options.storeFilter === 'uncategorized' ? 'uncategorized' : null,
+    uncategorizedStoreCount: db.prepare(`
+      SELECT COUNT(*) AS c FROM store_products
+      WHERE id NOT IN (SELECT DISTINCT product_id FROM store_product_categories)
+    `).get().c,
     storePillOrder: buildStorePillOrder(storeCategories, getStoreAllPillPosition()),
     storeComingSoon: isStoreComingSoon(),
     printifyConnected: !!db.prepare("SELECT value FROM settings WHERE key = 'printify_shop_id'").get(),
@@ -253,7 +264,7 @@ router.get('/', requireAdmin, (req, res) => {
   const uploadError = req.query.uploadError ? decodeURIComponent(req.query.uploadError) : null;
 
   res.render('admin/dashboard', {
-    ...dashboardData({ pendingSearch: req.query.pendingSearch, pendingPage: req.query.pendingPage }),
+    ...dashboardData({ pendingSearch: req.query.pendingSearch, pendingPage: req.query.pendingPage, storeFilter: req.query.storeFilter }),
     error: uploadError, success, autoContinueProtection, page: 'admin'
   });
 });
