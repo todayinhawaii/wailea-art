@@ -364,4 +364,83 @@
       }
     });
   })();
+
+  // ---------- Bulk-publish pending Printify products ----------
+  (function () {
+    const selectAllPending = document.getElementById('selectAllPendingPrintify');
+    const publishBtn = document.getElementById('bulkPublishPendingBtn');
+    if (!selectAllPending || !publishBtn) return;
+
+    const countEl = document.getElementById('bulkPublishCount');
+    const statusEl = document.getElementById('bulkPublishStatus');
+    const categorySelect = document.getElementById('bulkPublishCategory');
+    const totalPendingCount = parseInt(selectAllPending.parentElement.textContent.match(/\d+/)[0], 10) || 0;
+
+    function visibleCheckboxes() {
+      return [...document.querySelectorAll('.pending-printify-checkbox')];
+    }
+
+    function updateButton() {
+      if (selectAllPending.checked) {
+        countEl.textContent = totalPendingCount;
+        publishBtn.disabled = false;
+        return;
+      }
+      const checked = visibleCheckboxes().filter(cb => cb.checked);
+      countEl.textContent = checked.length;
+      publishBtn.disabled = checked.length === 0;
+    }
+
+    selectAllPending.addEventListener('change', () => {
+      visibleCheckboxes().forEach(cb => { cb.checked = selectAllPending.checked; });
+      updateButton();
+    });
+
+    document.addEventListener('change', (e) => {
+      if (e.target.classList.contains('pending-printify-checkbox')) {
+        if (!e.target.checked) selectAllPending.checked = false;
+        updateButton();
+      }
+    });
+
+    publishBtn.addEventListener('click', async () => {
+      const usingSelectAll = selectAllPending.checked;
+      const ids = usingSelectAll ? [] : visibleCheckboxes().filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
+      const count = usingSelectAll ? totalPendingCount : ids.length;
+      if (count === 0) return;
+
+      const categoryId = categorySelect ? categorySelect.value : '';
+      const categoryName = categorySelect && categoryId ? categorySelect.options[categorySelect.selectedIndex].text : 'no category';
+
+      if (!confirm(`Publish ${count} product${count === 1 ? '' : 's'} with ${categoryName}? This makes them live on your "Our Store" page.`)) return;
+
+      publishBtn.disabled = true;
+      publishBtn.textContent = 'Publishing…';
+      statusEl.textContent = '';
+
+      try {
+        const res = await fetch('/admin/store-products/bulk-publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ids: usingSelectAll ? undefined : ids,
+            selectAllPending: usingSelectAll,
+            categoryId: categoryId || null
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+
+        statusEl.style.color = '#2f5c30';
+        statusEl.textContent = `✓ Published ${data.published}. Reloading…`;
+        setTimeout(() => window.location.reload(), 800);
+      } catch (err) {
+        console.error('Bulk publish failed', err);
+        statusEl.style.color = 'var(--danger)';
+        statusEl.textContent = err.message || 'Could not publish. Please try again.';
+        publishBtn.disabled = false;
+        publishBtn.textContent = `Publish selected (${count})`;
+      }
+    });
+  })();
 })();

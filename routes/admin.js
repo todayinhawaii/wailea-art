@@ -165,7 +165,7 @@ function dashboardData() {
     printifyShopTitle: (db.prepare("SELECT value FROM settings WHERE key = 'printify_shop_title'").get() || {}).value || '',
     printifyConfigured: printify.isConfigured(),
     printifyPendingCount: db.prepare("SELECT COUNT(*) AS c FROM store_products WHERE source = 'printify' AND published = 0").get().c,
-    printifyPendingProducts: db.prepare("SELECT * FROM store_products WHERE source = 'printify' AND published = 0 ORDER BY id DESC").all()
+    printifyPendingProducts: db.prepare("SELECT * FROM store_products WHERE source = 'printify' AND published = 0 ORDER BY id DESC LIMIT 25").all()
       .map(p => ({
         ...p,
         selectedCategoryIds: db.prepare('SELECT category_id FROM store_product_categories WHERE product_id = ?').all(p.id).map(r => r.category_id)
@@ -964,6 +964,41 @@ router.post('/store-products/reorder', requireAdmin, (req, res) => {
   tx(orderedIds);
 
   res.json({ ok: true });
+});
+
+// IMPORTANT: must stay registered before the generic '/store-products/:id' route.
+router.post('/store-products/bulk-publish', requireAdmin, (req, res) => {
+  const { ids, selectAllPending, categoryId } = req.body;
+
+  let targetIds;
+  if (selectAllPending) {
+    // Operate on every pending Printify product, not just the ones
+    // currently rendered on the page — this is what makes it possible to
+    // publish hundreds of synced products without scrolling through them.
+    targetIds = db.prepare("SELECT id FROM store_products WHERE source = 'printify' AND published = 0").all().map(r => r.id);
+  } else if (Array.isArray(ids)) {
+    targetIds = ids.map(id => parseInt(id, 10)).filter(Number.isInteger);
+  } else {
+    return res.status(400).json({ error: 'No products selected.' });
+  }
+
+  if (targetIds.length === 0) {
+    return res.json({ ok: true, published: 0 });
+  }
+
+  const catId = categoryId ? parseInt(categoryId, 10) : null;
+  const markPublished = db.prepare('UPDATE store_products SET published = 1 WHERE id = ?');
+  const addCategory = db.prepare('INSERT OR IGNORE INTO store_product_categories (product_id, category_id) VALUES (?, ?)');
+
+  const tx = db.transaction((idList) => {
+    idList.forEach(id => {
+      if (catId) addCategory.run(id, catId);
+      markPublished.run(id);
+    });
+  });
+  tx(targetIds);
+
+  res.json({ ok: true, published: targetIds.length });
 });
 
 router.post('/store-products/:id', requireAdmin, withUploadErrorHandling(upload.single('image')), async (req, res) => {
