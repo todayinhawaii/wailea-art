@@ -666,6 +666,7 @@ form.stack .field-group { margin: 0 0 16px; }
   margin-bottom: 24px;
 }
 .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.admin-store-top { margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid var(--sand-line); display: flex; flex-direction: column; gap: 24px; }
 @media (max-width: 800px) { .admin-grid { grid-template-columns: 1fr; } }
 
 .login-shell {

@@ -21,24 +21,28 @@ if (process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
 // contact form. Fails silently (just logs) so a broken email setup never
 // blocks the actual form submission — the message is always saved to the
 // database first, regardless of whether this succeeds.
-async function sendContactNotification({ name, email, message }) {
+async function sendContactNotification({ name, email, message, businessName, wantsWholesale, businessAddress }) {
   if (!mailTransporter) {
     console.log('Email not configured (SMTP_USER/SMTP_PASSWORD missing) — skipping notification email.');
     return;
   }
 
   const toAddress = process.env.CONTACT_EMAIL || process.env.SMTP_USER;
+  const subjectPrefix = wantsWholesale ? '🏪 Wholesale inquiry' : 'New message';
 
   try {
     await mailTransporter.sendMail({
       from: `"Wailea Art website" <${process.env.SMTP_USER}>`,
       to: toAddress,
       replyTo: email,
-      subject: `New message from ${name} — Wailea Art contact form`,
-      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+      subject: `${subjectPrefix} from ${name} — Wailea Art contact form`,
+      text: `Name: ${name}\nEmail: ${email}\n${businessName ? `Business: ${businessName}\n` : ''}${wantsWholesale ? `Wants to showcase Wailea Art in their shop/gallery: Yes\n` : ''}${businessAddress ? `Business address: ${businessAddress}\n` : ''}\nMessage:\n${message}`,
       html: `
+        ${wantsWholesale ? '<p style="background:#fdf6e3; padding:10px 14px; border-radius:6px; font-weight:bold;">🏪 This person wants to showcase Wailea Art in their shop or gallery</p>' : ''}
         <p><strong>Name:</strong> ${name}</p>
         <p><strong>Email:</strong> ${email}</p>
+        ${businessName ? `<p><strong>Business:</strong> ${businessName}</p>` : ''}
+        ${businessAddress ? `<p><strong>Business address:</strong> ${businessAddress}</p>` : ''}
         <p><strong>Message:</strong></p>
         <p>${message.replace(/\n/g, '<br>')}</p>
         <hr>
@@ -229,14 +233,34 @@ router.get('/contact', (req, res) => {
 });
 
 router.post('/contact', (req, res) => {
-  const { name, email, message } = req.body;
+  const { name, email, message, business_name, business_address } = req.body;
+  const wantsWholesale = req.body.wants_wholesale ? 1 : 0;
+
   if (!name || !email || !message) {
     return res.render('contact', { page: 'contact', sent: false, error: 'Please fill in every field.' });
   }
-  db.prepare('INSERT INTO messages (name, email, message) VALUES (?, ?, ?)').run(
-    name.trim(), email.trim(), message.trim()
+
+  const isBlocked = db.prepare('SELECT 1 FROM blocked_emails WHERE email = ?').get(email.trim().toLowerCase());
+  if (isBlocked) {
+    // Silently succeed from the sender's point of view — no message saved,
+    // no notification sent, and no hint to them that they've been blocked.
+    return res.redirect('/contact?sent=1');
+  }
+
+  db.prepare('INSERT INTO messages (name, email, message, business_name, wants_wholesale, business_address) VALUES (?, ?, ?, ?, ?, ?)').run(
+    name.trim(), email.trim(), message.trim(),
+    (business_name || '').trim() || null,
+    wantsWholesale,
+    (business_address || '').trim() || null
   );
-  sendContactNotification({ name: name.trim(), email: email.trim(), message: message.trim() });
+  sendContactNotification({
+    name: name.trim(),
+    email: email.trim(),
+    message: message.trim(),
+    businessName: (business_name || '').trim(),
+    wantsWholesale: !!wantsWholesale,
+    businessAddress: (business_address || '').trim()
+  });
   res.redirect('/contact?sent=1');
 });
 

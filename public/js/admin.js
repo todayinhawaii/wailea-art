@@ -211,4 +211,157 @@
       }
     });
   })();
+
+  // ---------- Bulk select, delete & email messages ----------
+  (function () {
+    const selectAll = document.getElementById('selectAllMessages');
+    const checkboxes = () => [...document.querySelectorAll('.message-select-checkbox')];
+    const deleteBtn = document.getElementById('deleteSelectedMessagesBtn');
+    const emailBtn = document.getElementById('emailSelectedMessagesBtn');
+    const countEl = document.getElementById('selectedMessagesCount');
+    const countForEmailEl = document.getElementById('selectedMessagesCountForEmail');
+    const composer = document.getElementById('messageEmailComposer');
+    const subjectInput = document.getElementById('marketingEmailSubject');
+    const bodyInput = document.getElementById('marketingEmailBody');
+    const sendBtn = document.getElementById('sendMarketingEmailBtn');
+    const cancelBtn = document.getElementById('cancelMarketingEmailBtn');
+    const statusEl = document.getElementById('marketingEmailStatus');
+    const blockBtn = document.getElementById('blockSelectedMessagesBtn');
+    const countForBlockEl = document.getElementById('selectedMessagesCountForBlock');
+    if (!selectAll || !deleteBtn) return;
+
+    function selectedIds() {
+      return checkboxes().filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
+    }
+
+    function updateButtons() {
+      const ids = selectedIds();
+      countEl.textContent = ids.length;
+      countForEmailEl.textContent = ids.length;
+      countForBlockEl.textContent = ids.length;
+      deleteBtn.style.display = ids.length > 0 ? 'inline-flex' : 'none';
+      emailBtn.style.display = ids.length > 0 ? 'inline-flex' : 'none';
+      blockBtn.style.display = ids.length > 0 ? 'inline-flex' : 'none';
+      selectAll.checked = ids.length > 0 && ids.length === checkboxes().length;
+      if (ids.length === 0) composer.classList.add('hidden');
+    }
+
+    selectAll.addEventListener('change', () => {
+      checkboxes().forEach(cb => { cb.checked = selectAll.checked; });
+      updateButtons();
+    });
+
+    document.addEventListener('change', (e) => {
+      if (e.target.classList.contains('message-select-checkbox')) updateButtons();
+    });
+
+    let lastClickedIndex = null;
+    document.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('message-select-checkbox')) return;
+      const boxes = checkboxes();
+      const currentIndex = boxes.indexOf(e.target);
+      if (e.shiftKey && lastClickedIndex !== null) {
+        const [start, end] = [lastClickedIndex, currentIndex].sort((a, b) => a - b);
+        const shouldCheck = e.target.checked;
+        for (let i = start; i <= end; i++) boxes[i].checked = shouldCheck;
+        updateButtons();
+      }
+      lastClickedIndex = currentIndex;
+    });
+
+    deleteBtn.addEventListener('click', async () => {
+      const ids = selectedIds();
+      if (ids.length === 0) return;
+      if (!confirm(`Delete ${ids.length} message${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting…';
+      try {
+        const res = await fetch('/admin/messages/bulk-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids })
+        });
+        if (!res.ok) throw new Error('Server returned an error');
+        window.location.reload();
+      } catch (err) {
+        console.error('Bulk delete failed', err);
+        alert('Could not delete the selected messages. Please try again.');
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = `Delete selected (${ids.length})`;
+      }
+    });
+
+    emailBtn.addEventListener('click', () => {
+      composer.classList.remove('hidden');
+      statusEl.textContent = '';
+    });
+
+    blockBtn.addEventListener('click', async () => {
+      const ids = selectedIds();
+      if (ids.length === 0) return;
+      if (!confirm(`Block the sender${ids.length === 1 ? '' : 's'} of ${ids.length} selected message${ids.length === 1 ? '' : 's'}? You'll never see messages or emails from them again unless you unblock later.`)) return;
+
+      blockBtn.disabled = true;
+      blockBtn.textContent = 'Blocking…';
+      try {
+        const res = await fetch('/admin/messages/block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids })
+        });
+        if (!res.ok) throw new Error('Server returned an error');
+        window.location.reload();
+      } catch (err) {
+        console.error('Block failed', err);
+        alert('Could not block the selected sender(s). Please try again.');
+        blockBtn.disabled = false;
+        blockBtn.textContent = `🚫 Block sender (${ids.length})`;
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      composer.classList.add('hidden');
+    });
+
+    sendBtn.addEventListener('click', async () => {
+      const ids = selectedIds();
+      const subject = subjectInput.value.trim();
+      const body = bodyInput.value.trim();
+
+      if (ids.length === 0) return;
+      if (!subject || !body) {
+        statusEl.textContent = 'Please write both a subject and a message.';
+        statusEl.style.color = 'var(--danger)';
+        return;
+      }
+      if (!confirm(`Send this email to ${ids.length} recipient${ids.length === 1 ? '' : 's'}?`)) return;
+
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending…';
+      statusEl.textContent = '';
+
+      try {
+        const res = await fetch('/admin/messages/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids, subject, body })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+
+        statusEl.style.color = '#2f5c30';
+        statusEl.textContent = `✓ Sent to ${data.sent} of ${data.total}` + (data.failed ? ` (${data.failed} failed)` : '') + '.';
+        subjectInput.value = '';
+        bodyInput.value = '';
+      } catch (err) {
+        console.error('Marketing email failed', err);
+        statusEl.style.color = 'var(--danger)';
+        statusEl.textContent = err.message || 'Could not send the email. Please try again.';
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send email';
+      }
+    });
+  })();
 })();

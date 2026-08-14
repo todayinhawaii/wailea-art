@@ -26,6 +26,20 @@
         <input type="email" id="email" name="email" required>
       </div>
       <div class="field-group">
+        <label for="business_name">Business name (optional)</label>
+        <input type="text" id="business_name" name="business_name" placeholder="If you're contacting us on behalf of a shop or gallery">
+      </div>
+      <div class="field-group">
+        <label class="checkbox-pill" style="width: fit-content;">
+          <input type="checkbox" id="wants_wholesale" name="wants_wholesale" value="1">
+          <span>I'd like to showcase Wailea Art in my shop or gallery</span>
+        </label>
+      </div>
+      <div class="field-group hidden" id="businessAddressGroup">
+        <label for="business_address">Business address</label>
+        <textarea id="business_address" name="business_address" rows="3" placeholder="Street address, city, state, zip"></textarea>
+      </div>
+      <div class="field-group">
         <label for="message">Message</label>
         <textarea id="message" name="message" rows="5" required></textarea>
       </div>
@@ -33,5 +47,11 @@
     </form>
   </div>
 </main>
+
+<script>
+  document.getElementById('wants_wholesale').addEventListener('change', function () {
+    document.getElementById('businessAddressGroup').classList.toggle('hidden', !this.checked);
+  });
+</script>
 
 <%- include('partials/site-footer') %>

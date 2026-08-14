@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
+const nodemailer = require('nodemailer');
 const db = require('../db');
 const { upload, uploadPostMedia, withUploadErrorHandling } = require('../lib/upload');
 const requireAdmin = require('../lib/requireAdmin');
@@ -10,6 +11,19 @@ const slugify = require('../lib/slugify');
 const excerptFromHtml = require('../lib/excerpt');
 const detectOrientation = require('../lib/detectOrientation');
 const { splitUploadedFile, createPreview, originalsDir } = require('../lib/imagePreview');
+
+let mailTransporter = null;
+if (process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+  mailTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'mail.privateemail.com',
+    port: parseInt(process.env.SMTP_PORT, 10) || 587,
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD
+    }
+  });
+}
 
 // ---------- Login ----------
 
@@ -156,7 +170,12 @@ function dashboardData() {
         ...p,
         selectedCategoryIds: db.prepare('SELECT category_id FROM store_product_categories WHERE product_id = ?').all(p.id).map(r => r.category_id)
       })),
-    messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all(),
+    messages: db.prepare(`
+      SELECT * FROM messages
+      WHERE email NOT IN (SELECT email FROM blocked_emails)
+      ORDER BY created_at DESC LIMIT 20
+    `).all(),
+    blockedEmails: db.prepare('SELECT * FROM blocked_emails ORDER BY blocked_at DESC').all(),
     posts: db.prepare('SELECT * FROM posts ORDER BY position ASC, published_at DESC').all(),
     unprotectedCount
   };
@@ -1130,6 +1149,81 @@ router.post('/posts/:id/delete', requireAdmin, (req, res) => {
   }
   db.prepare('DELETE FROM posts WHERE id = ?').run(req.params.id);
   res.redirect('/admin');
+});
+
+// ---------- Messages ----------
+
+router.post('/messages/block', requireAdmin, (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No messages selected.' });
+
+  const validIds = ids.map(id => parseInt(id, 10)).filter(Number.isInteger);
+  const placeholders = validIds.map(() => '?').join(',');
+  const emails = db.prepare(`SELECT DISTINCT email FROM messages WHERE id IN (${placeholders})`).all(...validIds);
+
+  const insert = db.prepare('INSERT OR IGNORE INTO blocked_emails (email) VALUES (?)');
+  const tx = db.transaction((rows) => {
+    rows.forEach(r => insert.run(r.email.toLowerCase()));
+  });
+  tx(emails);
+
+  res.json({ ok: true, blocked: emails.length });
+});
+
+router.post('/blocked-emails/:id/unblock', requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM blocked_emails WHERE id = ?').run(req.params.id);
+  res.redirect('/admin');
+});
+
+router.post('/messages/bulk-delete', requireAdmin, (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No messages selected.' });
+
+  const validIds = ids.map(id => parseInt(id, 10)).filter(Number.isInteger);
+  const del = db.prepare('DELETE FROM messages WHERE id = ?');
+  const tx = db.transaction((idList) => { idList.forEach(id => del.run(id)); });
+  tx(validIds);
+
+  res.json({ ok: true, deleted: validIds.length });
+});
+
+router.post('/messages/send-email', requireAdmin, async (req, res) => {
+  const { ids, subject, body } = req.body;
+
+  if (!mailTransporter) {
+    return res.status(400).json({ error: 'Email is not configured (missing SMTP_USER/SMTP_PASSWORD in Render).' });
+  }
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'No recipients selected.' });
+  }
+  if (!subject || !subject.trim() || !body || !body.trim()) {
+    return res.status(400).json({ error: 'Please write a subject and message.' });
+  }
+
+  const validIds = ids.map(id => parseInt(id, 10)).filter(Number.isInteger);
+  const placeholders = validIds.map(() => '?').join(',');
+  const recipients = db.prepare(`SELECT DISTINCT name, email FROM messages WHERE id IN (${placeholders})`).all(...validIds);
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const r of recipients) {
+    try {
+      await mailTransporter.sendMail({
+        from: `"Wailea Art" <${process.env.SMTP_USER}>`,
+        to: r.email,
+        subject: subject.trim(),
+        text: body.trim(),
+        html: `<p>${body.trim().replace(/\n/g, '<br>')}</p>`
+      });
+      sent++;
+    } catch (err) {
+      console.error(`Failed to send marketing email to ${r.email}:`, err.message);
+      failed++;
+    }
+  }
+
+  res.json({ ok: true, sent, failed, total: recipients.length });
 });
 
 module.exports = router;

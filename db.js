@@ -99,7 +99,16 @@ db.exec(`
     name TEXT NOT NULL,
     email TEXT NOT NULL,
     message TEXT NOT NULL,
+    business_name TEXT,
+    wants_wholesale INTEGER NOT NULL DEFAULT 0,
+    business_address TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS blocked_emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    blocked_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS settings (
@@ -172,6 +181,17 @@ if (storeProductCols.length && !storeProductCols.includes('published')) {
 }
 if (storeProductCols.length && !storeProductCols.includes('printify_product_id')) {
   db.exec(`ALTER TABLE store_products ADD COLUMN printify_product_id TEXT`);
+}
+
+const messageCols = db.prepare("PRAGMA table_info(messages)").all().map(c => c.name);
+if (messageCols.length && !messageCols.includes('business_name')) {
+  db.exec(`ALTER TABLE messages ADD COLUMN business_name TEXT`);
+}
+if (messageCols.length && !messageCols.includes('wants_wholesale')) {
+  db.exec(`ALTER TABLE messages ADD COLUMN wants_wholesale INTEGER NOT NULL DEFAULT 0`);
+}
+if (messageCols.length && !messageCols.includes('business_address')) {
+  db.exec(`ALTER TABLE messages ADD COLUMN business_address TEXT`);
 }
 
 module.exports = db;
