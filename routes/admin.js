@@ -540,6 +540,16 @@ router.post('/artworks/:id', requireAdmin, withUploadErrorHandling(upload.single
   }
 });
 
+router.post('/artworks/:id/publish', requireAdmin, (req, res) => {
+  db.prepare('UPDATE artworks SET published = 1 WHERE id = ?').run(req.params.id);
+  res.redirect('/admin');
+});
+
+router.post('/artworks/:id/unpublish', requireAdmin, (req, res) => {
+  db.prepare('UPDATE artworks SET published = 0 WHERE id = ?').run(req.params.id);
+  res.redirect('/admin');
+});
+
 router.post('/artworks/:id/delete', requireAdmin, (req, res) => {
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(req.params.id);
   const extraImages = db.prepare('SELECT * FROM artwork_images WHERE artwork_id = ?').all(req.params.id);

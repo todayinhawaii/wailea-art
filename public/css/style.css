@@ -716,6 +716,22 @@ form.stack .field-group { margin: 0 0 16px; }
 }
 .sortable-item .item-title { flex: 1; font-size: 0.92rem; }
 .item-actions { display: flex; gap: 6px; }
+.live-toggle-btn {
+  font-weight: 600;
+  border: 1.5px solid transparent;
+}
+.live-toggle-btn.is-live {
+  background: #e3f5e6;
+  color: #2f7d3a;
+  border-color: #a8dbb0;
+}
+.live-toggle-btn.is-live:hover { background: #d3f0d8; }
+.live-toggle-btn.is-offline {
+  background: #f0eee8;
+  color: var(--ink-soft);
+  border-color: var(--sand-line);
+}
+.live-toggle-btn.is-offline:hover { background: #e6e3da; }
 
 .msg-item {
   padding: 12px 0;

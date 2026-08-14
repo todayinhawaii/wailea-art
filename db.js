@@ -26,6 +26,7 @@ db.exec(`
     price_bulk_packaging REAL NOT NULL DEFAULT 30.00,
     price_bulk_no_packaging REAL NOT NULL DEFAULT 25.00,
     position REAL NOT NULL,
+    published INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -139,6 +140,9 @@ if (!artworkCols.includes('slug')) {
 }
 if (!artworkCols.includes('sku')) {
   db.exec(`ALTER TABLE artworks ADD COLUMN sku TEXT`);
+}
+if (!artworkCols.includes('published')) {
+  db.exec(`ALTER TABLE artworks ADD COLUMN published INTEGER NOT NULL DEFAULT 1`);
 }
 
 // Backfill slugs for any artwork that doesn't have one yet — existing

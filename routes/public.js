@@ -106,7 +106,7 @@ router.get('/sitemap.xml', (req, res) => {
   const siteUrl = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
   const categories = db.prepare('SELECT slug FROM categories').all();
   const posts = db.prepare('SELECT slug, published_at FROM posts').all();
-  const artworkSlugs = db.prepare('SELECT slug FROM artworks WHERE slug IS NOT NULL').all();
+  const artworkSlugs = db.prepare('SELECT slug FROM artworks WHERE slug IS NOT NULL AND published = 1').all();
 
   const urls = [
     { loc: `${siteUrl}/`, priority: '1.0', changefreq: 'weekly' },
@@ -148,11 +148,11 @@ router.get('/', (req, res) => {
       SELECT DISTINCT a.* FROM artworks a
       JOIN artwork_categories ac ON ac.artwork_id = a.id
       JOIN categories c ON c.id = ac.category_id
-      WHERE c.slug = ?
+      WHERE c.slug = ? AND a.published = 1
       ORDER BY a.position ASC
     `).all(activeSlug);
   } else {
-    artworks = db.prepare('SELECT * FROM artworks ORDER BY position ASC').all();
+    artworks = db.prepare('SELECT * FROM artworks WHERE published = 1 ORDER BY position ASC').all();
   }
 
   const extraImagesStmt = db.prepare('SELECT image_path FROM artwork_images WHERE artwork_id = ? ORDER BY position ASC');
@@ -206,14 +206,14 @@ router.get('/store', (req, res) => {
 });
 
 router.get('/art/:slug', (req, res, next) => {
-  const art = db.prepare('SELECT * FROM artworks WHERE slug = ?').get(req.params.slug);
+  const art = db.prepare('SELECT * FROM artworks WHERE slug = ? AND published = 1').get(req.params.slug);
   if (!art) return next();
 
   const extraImages = db.prepare('SELECT image_path FROM artwork_images WHERE artwork_id = ? ORDER BY position ASC').all(art.id);
   art.images = [art.image_path, ...extraImages.map(r => r.image_path)];
 
   const related = db.prepare(`
-    SELECT * FROM artworks WHERE id != ? ORDER BY RANDOM() LIMIT 4
+    SELECT * FROM artworks WHERE id != ? AND published = 1 ORDER BY RANDOM() LIMIT 4
   `).all(art.id);
   const relatedExtraStmt = db.prepare('SELECT image_path FROM artwork_images WHERE artwork_id = ? ORDER BY position ASC LIMIT 1');
   related.forEach(r => {
