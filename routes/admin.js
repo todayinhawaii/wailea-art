@@ -77,10 +77,11 @@ function getStoreProductsWithCategories(filter) {
   const products = filter === 'uncategorized'
     ? db.prepare(`
         SELECT * FROM store_products
-        WHERE id NOT IN (SELECT DISTINCT product_id FROM store_product_categories)
+        WHERE published = 1
+          AND id NOT IN (SELECT DISTINCT product_id FROM store_product_categories)
         ORDER BY position ASC
       `).all()
-    : db.prepare('SELECT * FROM store_products ORDER BY position ASC').all();
+    : db.prepare('SELECT * FROM store_products WHERE published = 1 ORDER BY position ASC').all();
   const catStmt = db.prepare(`
     SELECT c.id, c.name FROM store_categories c
     JOIN store_product_categories pc ON pc.category_id = c.id
@@ -184,7 +185,8 @@ function dashboardData(options = {}) {
     storeFilter: options.storeFilter === 'uncategorized' ? 'uncategorized' : null,
     uncategorizedStoreCount: db.prepare(`
       SELECT COUNT(*) AS c FROM store_products
-      WHERE id NOT IN (SELECT DISTINCT product_id FROM store_product_categories)
+      WHERE published = 1
+        AND id NOT IN (SELECT DISTINCT product_id FROM store_product_categories)
     `).get().c,
     storePillOrder: buildStorePillOrder(storeCategories, getStoreAllPillPosition()),
     storeComingSoon: isStoreComingSoon(),
