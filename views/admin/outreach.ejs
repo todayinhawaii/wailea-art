@@ -129,6 +129,7 @@
             <button class="btn btn-secondary btn-sm generate-draft-btn" type="button">✨ Generate draft</button>
           <% } %>
           <button class="btn btn-secondary btn-sm save-draft-btn" type="button">Save draft</button>
+          <a class="btn btn-secondary btn-sm" href="/admin/outreach/<%= lead.id %>/preview" target="_blank" rel="noopener">👁️ Preview design</a>
           <% if (lead.email) { %>
             <button class="btn btn-primary btn-sm send-outreach-btn" type="button">Send email</button>
           <% } %>

@@ -768,6 +768,7 @@ router.post('/artworks/:id/move', requireAdmin, (req, res) => {
 
 const printify = require('../lib/printify');
 const anthropic = require('../lib/anthropic');
+const emailTemplate = require('../lib/emailTemplate');
 const { parse: parseCsv } = require('csv-parse/sync');
 
 // ---------- Store (Printify-ready product categories) ----------
@@ -1472,6 +1473,12 @@ router.post('/outreach/:id/save-draft', requireAdmin, (req, res) => {
   res.redirect('/admin/outreach');
 });
 
+router.get('/outreach/:id/preview', requireAdmin, (req, res) => {
+  const lead = db.prepare('SELECT * FROM outreach_leads WHERE id = ?').get(req.params.id);
+  if (!lead) return res.status(404).send('Lead not found.');
+  res.send(emailTemplate.wrapInWelcomeTemplate(lead.draft_body || '(No draft written yet — generate or write one first, then preview again.)'));
+});
+
 router.post('/outreach/:id/send', requireAdmin, async (req, res) => {
   const lead = db.prepare('SELECT * FROM outreach_leads WHERE id = ?').get(req.params.id);
   if (!lead) return res.status(404).json({ error: 'Lead not found.' });
@@ -1486,7 +1493,7 @@ router.post('/outreach/:id/send', requireAdmin, async (req, res) => {
       replyTo: process.env.CONTACT_EMAIL || process.env.SMTP_USER,
       subject: lead.draft_subject,
       text: lead.draft_body,
-      html: `<p>${lead.draft_body.replace(/\n/g, '<br>')}</p>`
+      html: emailTemplate.wrapInWelcomeTemplate(lead.draft_body)
     });
     db.prepare(`UPDATE outreach_leads SET status = 'sent', sent_at = datetime('now') WHERE id = ?`).run(lead.id);
     res.json({ ok: true });
