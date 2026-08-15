@@ -10,6 +10,7 @@
 
   const anthropicConfigured = window.ANTHROPIC_CONFIGURED;
   let previewDebounce = null;
+  let quill = null;
 
   function escapeHtml(str) {
     return String(str || '')
@@ -19,12 +20,35 @@
       .replace(/"/g, '&quot;');
   }
 
-  async function updatePreview(bodyText) {
+  // Old saved contacts (from before the rich text editor existed) have
+  // last_body stored as plain text with \n line breaks, not HTML. Detect
+  // that case and convert it to simple paragraphs so it loads into the
+  // editor correctly either way.
+  function toEditorHtml(content) {
+    if (!content) return '';
+    if (/<(p|br|div|h[1-6]|strong|em|a)\b/i.test(content)) return content; // already HTML
+    return content
+      .split(/\n\s*\n/)
+      .map(para => `<p>${escapeHtml(para).replace(/\n/g, '<br>')}</p>`)
+      .join('');
+  }
+
+  function getBodyHtml() {
+    return quill ? quill.root.innerHTML : '';
+  }
+
+  function setBodyHtml(html) {
+    if (!quill) return;
+    quill.setText('');
+    quill.clipboard.dangerouslyPasteHTML(html || '');
+  }
+
+  async function updatePreview(bodyHtml) {
     try {
       const res = await fetch('/admin/outreach/render-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'body=' + encodeURIComponent(bodyText || '')
+        body: 'body=' + encodeURIComponent(bodyHtml || '')
       });
       const html = await res.text();
       previewFrame.srcdoc = html;
@@ -38,7 +62,7 @@
     const email = isNew ? '' : contact.email;
     const label = isNew ? '' : contact.label;
     const subject = isNew ? '' : (contact.last_subject || '');
-    const body = isNew ? '' : (contact.last_body || '');
+    const bodyHtml = isNew ? '' : toEditorHtml(contact.last_body || '');
     const replies = (!isNew && contact.replies) ? contact.replies : [];
 
     const repliesHtml = replies.length > 0 ? `
@@ -79,7 +103,8 @@
 
       <div class="field-group" style="margin-bottom:10px;">
         <label>Message</label>
-        <textarea id="draftBodyInput" rows="7" placeholder="Your generated (or hand-written) email will appear here">${escapeHtml(body)}</textarea>
+        <p style="font-size:0.76rem; color:var(--ink-soft); margin:0 0 6px;">Type a link like www.wailea.art and it becomes clickable automatically when sent.</p>
+        <div id="draftBodyEditor" style="background:#fff; min-height:160px;"></div>
       </div>
 
       <div style="margin:14px 0 6px;">
@@ -95,8 +120,22 @@
       </div>
     `;
 
+    quill = new Quill('#draftBodyEditor', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          [{ header: [false, 2, 3] }],
+          ['bold', 'italic', 'underline'],
+          [{ color: [] }],
+          ['link'],
+          ['clean']
+        ]
+      }
+    });
+    if (bodyHtml) setBodyHtml(bodyHtml);
+
     wireEditorButtons(contact);
-    updatePreview(body);
+    updatePreview(getBodyHtml());
   }
 
   function selectContact(id) {
@@ -120,7 +159,6 @@
     const toInput = document.getElementById('toInput');
     const labelInput = document.getElementById('labelInput');
     const subjectInput = document.getElementById('draftSubjectInput');
-    const bodyInput = document.getElementById('draftBodyInput');
     const inReplyToInput = document.getElementById('inReplyToInput');
     const statusEl = document.getElementById('draftStatusMsg');
     const generateBtn = document.getElementById('generateDraftBtn');
@@ -138,17 +176,17 @@
         inReplyToInput.value = btn.dataset.messageId || '';
         const origSubject = btn.dataset.subject || '';
         subjectInput.value = /^re:/i.test(origSubject) ? origSubject : `Re: ${origSubject}`;
-        bodyInput.value = '';
-        bodyInput.focus();
+        setBodyHtml('');
+        quill.focus();
         setStatus('Replying to this message — write your response below.', false);
         updatePreview('');
       });
     });
 
     // Live-update the preview as they type, debounced so it doesn't hammer the server.
-    bodyInput.addEventListener('input', () => {
+    quill.on('text-change', () => {
       clearTimeout(previewDebounce);
-      previewDebounce = setTimeout(() => updatePreview(bodyInput.value), 400);
+      previewDebounce = setTimeout(() => updatePreview(getBodyHtml()), 400);
     });
 
     if (generateBtn) {
@@ -169,7 +207,7 @@
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Something went wrong.');
           subjectInput.value = data.subject;
-          bodyInput.value = data.body;
+          setBodyHtml(data.body);
           updatePreview(data.body);
           setStatus('✓ Draft generated. Review, then Send.', false);
         } catch (err) {
@@ -182,11 +220,14 @@
     }
 
     sendBtn.addEventListener('click', async () => {
+      const bodyHtml = getBodyHtml();
+      const bodyIsEmpty = quill.getText().trim().length === 0;
+
       if (!toInput.value.trim()) {
         setStatus('Enter an email address first.', true);
         return;
       }
-      if (!subjectInput.value.trim() || !bodyInput.value.trim()) {
+      if (!subjectInput.value.trim() || bodyIsEmpty) {
         setStatus('Write or generate a message before sending.', true);
         return;
       }
@@ -198,7 +239,7 @@
         const res = await fetch('/admin/outreach/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `email=${encodeURIComponent(toInput.value)}&label=${encodeURIComponent(labelInput.value)}&subject=${encodeURIComponent(subjectInput.value)}&body=${encodeURIComponent(bodyInput.value)}&inReplyTo=${encodeURIComponent(inReplyToInput.value)}`
+          body: `email=${encodeURIComponent(toInput.value)}&label=${encodeURIComponent(labelInput.value)}&subject=${encodeURIComponent(subjectInput.value)}&body=${encodeURIComponent(bodyHtml)}&inReplyTo=${encodeURIComponent(inReplyToInput.value)}`
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Something went wrong.');

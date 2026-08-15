@@ -1386,7 +1386,13 @@ router.post('/outreach/generate-draft', requireAdmin, async (req, res) => {
 
   try {
     const draft = await anthropic.draftOutreachEmail({ email: email.trim(), label: (label || '').trim() });
-    res.json({ ok: true, subject: draft.subject, body: draft.body });
+    // The AI returns plain text with \n line breaks — convert to simple HTML
+    // paragraphs so it loads cleanly into the rich text editor.
+    const bodyHtml = draft.body
+      .split(/\n\s*\n/)
+      .map(para => `<p>${para.trim().replace(/\n/g, '<br>')}</p>`)
+      .join('');
+    res.json({ ok: true, subject: draft.subject, body: bodyHtml });
   } catch (err) {
     console.error('AI draft error:', err.message);
     res.status(500).json({ error: err.message });
@@ -1395,14 +1401,16 @@ router.post('/outreach/generate-draft', requireAdmin, async (req, res) => {
 
 router.post('/outreach/render-preview', requireAdmin, (req, res) => {
   const { body } = req.body;
-  res.send(emailTemplate.wrapInWelcomeTemplate(body || '(Nothing written yet — generate or write a message to see it here.)'));
+  res.send(emailTemplate.wrapInWelcomeTemplate(body || '<p>(Nothing written yet — generate or write a message to see it here.)</p>'));
 });
 
 router.post('/outreach/send', requireAdmin, async (req, res) => {
   const { email, label, subject, body, inReplyTo } = req.body;
 
+  const plainTextBody = emailTemplate.htmlToPlainText(body);
+
   if (!isRealEmail(email)) return res.status(400).json({ error: 'Enter a valid email address first.' });
-  if (!subject || !subject.trim() || !body || !body.trim()) return res.status(400).json({ error: 'Write or generate a message before sending.' });
+  if (!subject || !subject.trim() || !plainTextBody) return res.status(400).json({ error: 'Write or generate a message before sending.' });
   if (!mailTransporter) return res.status(400).json({ error: 'Email is not configured (missing SMTP_USER/SMTP_PASSWORD in Render).' });
 
   const cleanEmail = email.trim().toLowerCase();
@@ -1413,8 +1421,8 @@ router.post('/outreach/send', requireAdmin, async (req, res) => {
       to: cleanEmail,
       replyTo: process.env.CONTACT_EMAIL || process.env.SMTP_USER,
       subject: subject.trim(),
-      text: body.trim(),
-      html: emailTemplate.wrapInWelcomeTemplate(body.trim()),
+      text: plainTextBody,
+      html: emailTemplate.wrapInWelcomeTemplate(body),
       headers: {
         // A real, working opt-out signal — spam filters specifically look
         // for this on anything that reads as promotional/outreach mail,
