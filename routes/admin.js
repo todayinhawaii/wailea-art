@@ -1327,144 +1327,31 @@ router.post('/messages/send-email', requireAdmin, async (req, res) => {
   res.json({ ok: true, sent, failed, total: recipients.length });
 });
 
-// ---------- Wholesale Outreach ----------
+// ---------- Wholesale Outreach — simple email address book ----------
 
 function isRealEmail(value) {
   return !!value && /\S+@\S+\.\S+/.test(value);
 }
 
-router.post('/outreach/import', requireAdmin, uploadCsv.single('csv'), (req, res) => {
-  const region = (req.body.region || '').trim() || 'Unspecified';
-
-  if (!req.file) {
-    return res.redirect('/admin/outreach?importError=' + encodeURIComponent('Please choose a CSV file.'));
-  }
-
-  let records;
-  try {
-    records = parseCsv(req.file.buffer, { columns: true, skip_empty_lines: true, trim: true });
-  } catch (err) {
-    return res.redirect('/admin/outreach?importError=' + encodeURIComponent('Could not read that CSV file: ' + err.message));
-  }
-
-  const existingEmails = new Set(
-    db.prepare('SELECT LOWER(email) AS e FROM outreach_leads WHERE email IS NOT NULL').all().map(r => r.e)
-  );
-  const existingNoEmailKeys = new Set(
-    db.prepare('SELECT LOWER(business_name) AS b, LOWER(region) AS r FROM outreach_leads WHERE email IS NULL').all()
-      .map(row => `${row.b}::${row.r}`)
-  );
-
-  const insert = db.prepare(`
-    INSERT INTO outreach_leads (priority, business_name, location, region, email, website, contact_name, business_type, why_fit, phone, notes, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')
-  `);
-
-  let imported = 0;
-  let skippedDuplicate = 0;
-  let skippedNoBusinessName = 0;
-
-  const tx = db.transaction((rows) => {
-    for (const row of rows) {
-      const businessName = (row.Business || row.business_name || '').trim();
-      if (!businessName) { skippedNoBusinessName++; continue; }
-
-      // A CSV can carry its own per-row region (useful for a combined,
-      // multi-island file) — falls back to the typed label above when the
-      // column isn't present, so every existing single-region file still
-      // works exactly as before.
-      const rowRegion = (row.Region || row.region || '').trim() || region;
-
-      const rawEmail = (row.Email || row.email || '').trim();
-      const hasRealEmail = isRealEmail(rawEmail);
-      const email = hasRealEmail ? rawEmail.toLowerCase() : null;
-
-      if (email) {
-        if (existingEmails.has(email)) { skippedDuplicate++; continue; }
-        existingEmails.add(email);
-      } else {
-        // No direct email to key on — fall back to business name + region
-        // so re-importing the same list doesn't create duplicate rows for
-        // every "use website contact form" style lead.
-        const noEmailKey = `${businessName.toLowerCase()}::${rowRegion.toLowerCase()}`;
-        if (existingNoEmailKeys.has(noEmailKey)) { skippedDuplicate++; continue; }
-        existingNoEmailKeys.add(noEmailKey);
-      }
-
-      const notes = (row.Notes || row.notes || '').trim();
-      const contactNote = (!hasRealEmail && rawEmail) ? `Contact method: ${rawEmail}. ${notes}`.trim() : notes;
-
-      insert.run(
-        (row.Priority || row.priority || '').trim(),
-        businessName,
-        (row.Location || row.location || '').trim(),
-        rowRegion,
-        email,
-        (row.Website || row.website || '').trim(),
-        (row.Contact || row.contact_name || '').trim(),
-        (row.Type || row.business_type || '').trim(),
-        (row.Why_Fit || row.why_fit || '').trim(),
-        (row.Phone || row.phone || '').trim(),
-        contactNote
-      );
-      imported++;
-    }
-  });
-  tx(records);
-
-  res.redirect(`/admin/outreach?imported=${imported}&skippedDuplicate=${skippedDuplicate}&skippedNoBusinessName=${skippedNoBusinessName}`);
-});
-
 router.get('/outreach', requireAdmin, (req, res) => {
-  const region = req.query.region || '';
-  const priority = req.query.priority || '';
-  const status = req.query.status || '';
-  const search = (req.query.search || '').trim();
-  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const perPage = 25;
-
-  const conditions = [];
-  const params = [];
-  if (region) { conditions.push('region = ?'); params.push(region); }
-  if (priority) { conditions.push('priority = ?'); params.push(priority); }
-  if (status) { conditions.push('status = ?'); params.push(status); }
-  if (search) { conditions.push('business_name LIKE ?'); params.push(`%${search}%`); }
-  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-
-  const totalCount = db.prepare(`SELECT COUNT(*) AS c FROM outreach_leads ${whereClause}`).get(...params).c;
-  const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
-  const clampedPage = Math.min(page, totalPages);
-  const offset = (clampedPage - 1) * perPage;
-
-  const leads = db.prepare(`
-    SELECT * FROM outreach_leads ${whereClause}
-    ORDER BY CASE priority WHEN 'A+' THEN 0 WHEN 'A' THEN 1 WHEN 'B+' THEN 2 ELSE 3 END, business_name ASC
-    LIMIT ? OFFSET ?
-  `).all(...params, perPage, offset);
-
-  const regions = db.prepare('SELECT DISTINCT region FROM outreach_leads ORDER BY region ASC').all().map(r => r.region);
-  const statusCounts = db.prepare('SELECT status, COUNT(*) AS c FROM outreach_leads GROUP BY status').all();
-  const totalLeads = db.prepare('SELECT COUNT(*) AS c FROM outreach_leads').get().c;
-  const noEmailCount = db.prepare('SELECT COUNT(*) AS c FROM outreach_leads WHERE email IS NULL').get().c;
+  const contacts = db.prepare(`
+    SELECT * FROM email_contacts
+    ORDER BY (last_sent_at IS NULL) ASC, last_sent_at DESC, created_at DESC
+  `).all();
 
   res.render('admin/outreach', {
-    leads, region, priority, status, search, currentPage: clampedPage, totalPages, totalCount,
-    regions, statusCounts, totalLeads, noEmailCount,
+    contacts,
     anthropicConfigured: anthropic.isConfigured(),
-    importedCount: req.query.imported, skippedDuplicate: req.query.skippedDuplicate,
-    skippedNoBusinessName: req.query.skippedNoBusinessName, importError: req.query.importError,
     page: 'admin'
   });
 });
 
-router.post('/outreach/:id/generate-draft', requireAdmin, async (req, res) => {
-  const lead = db.prepare('SELECT * FROM outreach_leads WHERE id = ?').get(req.params.id);
-  if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+router.post('/outreach/generate-draft', requireAdmin, async (req, res) => {
+  const { email, label } = req.body;
+  if (!isRealEmail(email)) return res.status(400).json({ error: 'Enter a valid email address first.' });
 
   try {
-    const draft = await anthropic.draftOutreachEmail(lead);
-    db.prepare(`UPDATE outreach_leads SET draft_subject = ?, draft_body = ?, status = 'drafted' WHERE id = ?`)
-      .run(draft.subject, draft.body, lead.id);
+    const draft = await anthropic.draftOutreachEmail({ email: email.trim(), label: (label || '').trim() });
     res.json({ ok: true, subject: draft.subject, body: draft.body });
   } catch (err) {
     console.error('AI draft error:', err.message);
@@ -1472,51 +1359,70 @@ router.post('/outreach/:id/generate-draft', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/outreach/:id/save-draft', requireAdmin, (req, res) => {
-  const { subject, body } = req.body;
-  db.prepare(`UPDATE outreach_leads SET draft_subject = ?, draft_body = ?, status = 'drafted' WHERE id = ?`)
-    .run((subject || '').trim(), (body || '').trim(), req.params.id);
-  res.redirect('/admin/outreach');
+router.post('/outreach/render-preview', requireAdmin, (req, res) => {
+  const { body } = req.body;
+  res.send(emailTemplate.wrapInWelcomeTemplate(body || '(Nothing written yet — generate or write a message to see it here.)'));
 });
 
-router.get('/outreach/:id/preview', requireAdmin, (req, res) => {
-  const lead = db.prepare('SELECT * FROM outreach_leads WHERE id = ?').get(req.params.id);
-  if (!lead) return res.status(404).send('Lead not found.');
-  res.send(emailTemplate.wrapInWelcomeTemplate(lead.draft_body || '(No draft written yet — generate or write one first, then preview again.)'));
-});
+router.post('/outreach/send', requireAdmin, async (req, res) => {
+  const { email, label, subject, body } = req.body;
 
-router.post('/outreach/:id/send', requireAdmin, async (req, res) => {
-  const lead = db.prepare('SELECT * FROM outreach_leads WHERE id = ?').get(req.params.id);
-  if (!lead) return res.status(404).json({ error: 'Lead not found.' });
-  if (!lead.email) return res.status(400).json({ error: 'This lead has no direct email address on file.' });
-  if (!lead.draft_subject || !lead.draft_body) return res.status(400).json({ error: 'Generate or write a draft before sending.' });
+  if (!isRealEmail(email)) return res.status(400).json({ error: 'Enter a valid email address first.' });
+  if (!subject || !subject.trim() || !body || !body.trim()) return res.status(400).json({ error: 'Write or generate a message before sending.' });
   if (!mailTransporter) return res.status(400).json({ error: 'Email is not configured (missing SMTP_USER/SMTP_PASSWORD in Render).' });
+
+  const cleanEmail = email.trim().toLowerCase();
 
   try {
     await mailTransporter.sendMail({
       from: `"Wailea Art" <${process.env.SMTP_USER}>`,
-      to: lead.email,
+      to: cleanEmail,
       replyTo: process.env.CONTACT_EMAIL || process.env.SMTP_USER,
-      subject: lead.draft_subject,
-      text: lead.draft_body,
-      html: emailTemplate.wrapInWelcomeTemplate(lead.draft_body)
+      subject: subject.trim(),
+      text: body.trim(),
+      html: emailTemplate.wrapInWelcomeTemplate(body.trim())
     });
-    db.prepare(`UPDATE outreach_leads SET status = 'sent', sent_at = datetime('now') WHERE id = ?`).run(lead.id);
-    res.json({ ok: true });
+
+    const existing = db.prepare('SELECT * FROM email_contacts WHERE email = ?').get(cleanEmail);
+    let timesSent;
+    if (existing) {
+      timesSent = existing.times_sent + 1;
+      db.prepare(`
+        UPDATE email_contacts
+        SET times_sent = ?, last_subject = ?, last_body = ?, last_sent_at = datetime('now'), label = CASE WHEN ? != '' THEN ? ELSE label END
+        WHERE id = ?
+      `).run(timesSent, subject.trim(), body.trim(), (label || '').trim(), (label || '').trim(), existing.id);
+    } else {
+      timesSent = 1;
+      db.prepare(`
+        INSERT INTO email_contacts (email, label, times_sent, last_subject, last_body, last_sent_at)
+        VALUES (?, ?, 1, ?, ?, datetime('now'))
+      `).run(cleanEmail, (label || '').trim(), subject.trim(), body.trim());
+    }
+
+    res.json({ ok: true, timesSent });
   } catch (err) {
     console.error('Outreach send error:', err.message);
     res.status(500).json({ error: 'Could not send that email. Please try again.' });
   }
 });
 
-router.post('/outreach/:id/mark-replied', requireAdmin, (req, res) => {
-  db.prepare(`UPDATE outreach_leads SET status = 'replied' WHERE id = ?`).run(req.params.id);
-  res.redirect('/admin/outreach');
+router.post('/outreach/contacts/:id', requireAdmin, (req, res) => {
+  const { email, label } = req.body;
+  if (!isRealEmail(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+
+  try {
+    db.prepare('UPDATE email_contacts SET email = ?, label = ? WHERE id = ?')
+      .run(email.trim().toLowerCase(), (label || '').trim(), req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: 'That email address is already saved for another contact.' });
+  }
 });
 
-router.post('/outreach/:id/delete', requireAdmin, (req, res) => {
-  db.prepare('DELETE FROM outreach_leads WHERE id = ?').run(req.params.id);
-  res.redirect('/admin/outreach');
+router.post('/outreach/contacts/:id/delete', requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM email_contacts WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
 });
 
 module.exports = router;

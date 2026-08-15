@@ -132,6 +132,17 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS email_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL DEFAULT '',
+    times_sent INTEGER NOT NULL DEFAULT 0,
+    last_subject TEXT,
+    last_body TEXT,
+    last_sent_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT

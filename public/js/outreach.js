@@ -1,18 +1,15 @@
 (function () {
   const sidebar = document.getElementById('outreachSidebar');
   const editor = document.getElementById('outreachEditor');
-  if (!sidebar || !editor) return; // empty-state page, nothing to wire up
-
-  const dataEl = document.getElementById('leadsData');
-  const leads = JSON.parse(dataEl.textContent);
-  const leadsById = {};
-  leads.forEach(l => { leadsById[l.id] = l; });
-
   const previewFrame = document.getElementById('outreachPreviewFrame');
-  const openPreviewTab = document.getElementById('openPreviewTab');
-  const anthropicConfigured = window.ANTHROPIC_CONFIGURED;
+  if (!sidebar || !editor || !previewFrame) return;
 
-  let activeId = leads[0].id;
+  const contactsData = JSON.parse(document.getElementById('contactsData').textContent);
+  const contactsById = {};
+  contactsData.forEach(c => { contactsById[c.id] = c; });
+
+  const anthropicConfigured = window.ANTHROPIC_CONFIGURED;
+  let previewDebounce = null;
 
   function escapeHtml(str) {
     return String(str || '')
@@ -22,15 +19,39 @@
       .replace(/"/g, '&quot;');
   }
 
-  function renderEditor(lead) {
+  async function updatePreview(bodyText) {
+    try {
+      const res = await fetch('/admin/outreach/render-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'body=' + encodeURIComponent(bodyText || '')
+      });
+      const html = await res.text();
+      previewFrame.srcdoc = html;
+    } catch (e) {
+      // Preview is a nice-to-have; a failed refresh shouldn't block anything else.
+    }
+  }
+
+  function renderEditor(contact) {
+    const isNew = !contact;
+    const email = isNew ? '' : contact.email;
+    const label = isNew ? '' : contact.label;
+    const subject = isNew ? '' : (contact.last_subject || '');
+    const body = isNew ? '' : (contact.last_body || '');
+
     editor.innerHTML = `
       <div class="field-group" style="margin-bottom:10px;">
         <label>To</label>
-        <input type="text" value="${lead.email ? escapeHtml(lead.email) : 'No direct email — visit their website instead'}" disabled style="background:#f0eee8; color:${lead.email ? 'var(--ink)' : 'var(--ink-soft)'};">
+        <input type="email" id="toInput" value="${escapeHtml(email)}" placeholder="name@example.com">
+      </div>
+      <div class="field-group" style="margin-bottom:10px;">
+        <label>Name / business (optional, helps AI personalize)</label>
+        <input type="text" id="labelInput" value="${escapeHtml(label)}" placeholder="e.g. Lahaina Galleries">
       </div>
       <div class="field-group" style="margin-bottom:10px;">
         <label>Subject</label>
-        <input type="text" id="draftSubjectInput" value="${escapeHtml(lead.draft_subject || '')}" placeholder="Click Generate below, or write your own">
+        <input type="text" id="draftSubjectInput" value="${escapeHtml(subject)}" placeholder="Click Generate below, or write your own">
       </div>
 
       <div style="margin:14px 0;">
@@ -39,164 +60,152 @@
 
       <div class="field-group" style="margin-bottom:10px;">
         <label>Message</label>
-        <textarea id="draftBodyInput" rows="7" placeholder="Your generated (or hand-written) email will appear here">${escapeHtml(lead.draft_body || '')}</textarea>
+        <textarea id="draftBodyInput" rows="7" placeholder="Your generated (or hand-written) email will appear here">${escapeHtml(body)}</textarea>
       </div>
 
       <div style="margin:14px 0 6px;">
-        ${lead.email ? `<button class="btn btn-primary btn-block" id="sendOutreachBtn" type="button" style="font-size:0.95rem; padding:12px; background:var(--ocean-dark, #536b58);">Send email</button>` : ''}
+        <button class="btn btn-primary btn-block" id="sendOutreachBtn" type="button" style="font-size:0.95rem; padding:12px; background:var(--ocean-dark, #536b58);">Send email</button>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-        <span id="draftStatusMsg" style="font-size:0.82rem;"></span>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; flex-wrap:wrap; gap:8px;">
+        <span id="draftStatusMsg" style="font-size:0.82rem;">${!isNew ? `Sent ${contact.times_sent}x to this address so far.` : ''}</span>
         <div style="display:flex; gap:8px;">
-          <button class="btn btn-secondary btn-sm" id="saveDraftBtn" type="button">Save draft</button>
-          ${lead.status === 'sent' ? `<button class="btn btn-secondary btn-sm" id="markRepliedBtn" type="button">Mark as replied</button>` : ''}
-          <button class="btn btn-sm" id="deleteLeadBtn" type="button" style="background:var(--danger); color:#fff;">Delete</button>
+          ${!isNew ? `<button class="btn btn-secondary btn-sm" id="saveContactBtn" type="button">Save changes</button>
+          <button class="btn btn-sm" id="deleteContactBtn" type="button" style="background:var(--danger); color:#fff;">Delete contact</button>` : ''}
         </div>
       </div>
-
-      <details style="margin-top:16px; font-size:0.82rem; color:var(--ink-soft);">
-        <summary style="cursor:pointer;">About this business</summary>
-        <p style="margin:8px 0 0;">
-          ${escapeHtml(lead.business_type)}${lead.contact_name ? ' &middot; Contact: ' + escapeHtml(lead.contact_name) : ''}
-          ${lead.website ? ` &middot; <a href="${escapeHtml(lead.website)}" target="_blank" rel="noopener">Website</a>` : ''}
-        </p>
-        <p style="margin:6px 0 0;">${escapeHtml(lead.why_fit)}</p>
-      </details>
     `;
 
-    wireEditorButtons(lead);
+    wireEditorButtons(contact);
+    updatePreview(body);
   }
 
-  function updatePreview(leadId) {
-    const url = `/admin/outreach/${leadId}/preview`;
-    previewFrame.src = url;
-    openPreviewTab.href = url;
-  }
-
-  function selectLead(id) {
-    activeId = id;
-    const lead = leadsById[id];
-    renderEditor(lead);
-    updatePreview(id);
-
+  function selectContact(id) {
     document.querySelectorAll('.outreach-sidebar-item').forEach(item => {
-      item.classList.toggle('active', parseInt(item.dataset.id, 10) === id);
+      item.classList.toggle('active', item.dataset.id === String(id));
     });
+    if (id === 'new') {
+      renderEditor(null);
+    } else {
+      renderEditor(contactsById[id]);
+    }
   }
 
   sidebar.addEventListener('click', (e) => {
     const item = e.target.closest('.outreach-sidebar-item');
     if (!item) return;
-    selectLead(parseInt(item.dataset.id, 10));
+    selectContact(item.dataset.id === 'new' ? 'new' : parseInt(item.dataset.id, 10));
   });
 
-  function wireEditorButtons(lead) {
+  function wireEditorButtons(contact) {
+    const toInput = document.getElementById('toInput');
+    const labelInput = document.getElementById('labelInput');
     const subjectInput = document.getElementById('draftSubjectInput');
     const bodyInput = document.getElementById('draftBodyInput');
     const statusEl = document.getElementById('draftStatusMsg');
     const generateBtn = document.getElementById('generateDraftBtn');
-    const saveBtn = document.getElementById('saveDraftBtn');
     const sendBtn = document.getElementById('sendOutreachBtn');
-    const markRepliedBtn = document.getElementById('markRepliedBtn');
-    const deleteBtn = document.getElementById('deleteLeadBtn');
+    const saveBtn = document.getElementById('saveContactBtn');
+    const deleteBtn = document.getElementById('deleteContactBtn');
 
     function setStatus(text, isError) {
       statusEl.textContent = text;
       statusEl.style.color = isError ? 'var(--danger)' : '#2f5c30';
     }
 
+    // Live-update the preview as they type, debounced so it doesn't hammer the server.
+    bodyInput.addEventListener('input', () => {
+      clearTimeout(previewDebounce);
+      previewDebounce = setTimeout(() => updatePreview(bodyInput.value), 400);
+    });
+
     if (generateBtn) {
       generateBtn.addEventListener('click', async () => {
+        if (!toInput.value.trim()) {
+          setStatus('Enter an email address first.', true);
+          return;
+        }
         generateBtn.disabled = true;
         generateBtn.textContent = 'Generating…';
         setStatus('', false);
         try {
-          const res = await fetch(`/admin/outreach/${lead.id}/generate-draft`, { method: 'POST' });
+          const res = await fetch('/admin/outreach/generate-draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `email=${encodeURIComponent(toInput.value)}&label=${encodeURIComponent(labelInput.value)}`
+          });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Something went wrong.');
           subjectInput.value = data.subject;
           bodyInput.value = data.body;
-          lead.draft_subject = data.subject;
-          lead.draft_body = data.body;
-          lead.status = 'drafted';
-          updatePreview(lead.id);
-          setStatus('✓ Draft generated. Review, then Preview or Send.', false);
+          updatePreview(data.body);
+          setStatus('✓ Draft generated. Review, then Send.', false);
         } catch (err) {
           setStatus(err.message || 'Could not generate a draft.', true);
         } finally {
           generateBtn.disabled = false;
-          generateBtn.textContent = '✨ Generate draft';
+          generateBtn.textContent = '✨ Generate email with AI';
         }
       });
     }
 
-    async function saveDraft() {
-      const formData = new URLSearchParams();
-      formData.set('subject', subjectInput.value);
-      formData.set('body', bodyInput.value);
-      await fetch(`/admin/outreach/${lead.id}/save-draft`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData.toString()
-      });
-      lead.draft_subject = subjectInput.value;
-      lead.draft_body = bodyInput.value;
-      lead.status = 'drafted';
-    }
+    sendBtn.addEventListener('click', async () => {
+      if (!toInput.value.trim()) {
+        setStatus('Enter an email address first.', true);
+        return;
+      }
+      if (!subjectInput.value.trim() || !bodyInput.value.trim()) {
+        setStatus('Write or generate a message before sending.', true);
+        return;
+      }
+      if (!confirm(`Send this email to ${toInput.value}? This goes out for real.`)) return;
 
-    saveBtn.addEventListener('click', async () => {
-      saveBtn.disabled = true;
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending…';
       try {
-        await saveDraft();
-        updatePreview(lead.id);
-        setStatus('✓ Draft saved.', false);
+        const res = await fetch('/admin/outreach/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `email=${encodeURIComponent(toInput.value)}&label=${encodeURIComponent(labelInput.value)}&subject=${encodeURIComponent(subjectInput.value)}&body=${encodeURIComponent(bodyInput.value)}`
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+        setStatus(`✓ Sent! (${data.timesSent}x total to this address). Reloading…`, false);
+        setTimeout(() => window.location.reload(), 900);
       } catch (err) {
-        setStatus('Could not save the draft.', true);
-      } finally {
-        saveBtn.disabled = false;
+        setStatus(err.message || 'Could not send.', true);
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send email';
       }
     });
 
-    if (sendBtn) {
-      sendBtn.addEventListener('click', async () => {
-        if (!subjectInput.value.trim() || !bodyInput.value.trim()) {
-          setStatus('Write or generate a draft before sending.', true);
-          return;
-        }
-        if (!confirm('Send this email now? This goes out for real.')) return;
-
-        await saveDraft();
-
-        sendBtn.disabled = true;
-        sendBtn.textContent = 'Sending…';
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
         try {
-          const res = await fetch(`/admin/outreach/${lead.id}/send`, { method: 'POST' });
+          const res = await fetch(`/admin/outreach/contacts/${contact.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `email=${encodeURIComponent(toInput.value)}&label=${encodeURIComponent(labelInput.value)}`
+          });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Something went wrong.');
-          setStatus('✓ Sent!', false);
-          setTimeout(() => window.location.reload(), 900);
+          setStatus('✓ Contact updated.', false);
         } catch (err) {
-          setStatus(err.message || 'Could not send.', true);
-          sendBtn.disabled = false;
-          sendBtn.textContent = 'Send email';
+          setStatus(err.message || 'Could not save changes.', true);
         }
       });
     }
 
-    if (markRepliedBtn) {
-      markRepliedBtn.addEventListener('click', () => {
-        fetch(`/admin/outreach/${lead.id}/mark-replied`, { method: 'POST' }).then(() => window.location.reload());
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        if (!confirm('Delete this saved contact? This cannot be undone.')) return;
+        await fetch(`/admin/outreach/contacts/${contact.id}/delete`, { method: 'POST' });
+        window.location.reload();
       });
     }
-
-    deleteBtn.addEventListener('click', () => {
-      if (!confirm('Delete this lead? This cannot be undone.')) return;
-      fetch(`/admin/outreach/${lead.id}/delete`, { method: 'POST' }).then(() => window.location.reload());
-    });
   }
 
-  // Show the first lead immediately — the template is visible the moment
+  // Show the compose form immediately — the template is visible the moment
   // this page loads, no extra click required.
-  selectLead(activeId);
+  selectContact('new');
 })();
