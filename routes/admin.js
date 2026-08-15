@@ -1380,7 +1380,13 @@ router.post('/outreach/send', requireAdmin, async (req, res) => {
       replyTo: process.env.CONTACT_EMAIL || process.env.SMTP_USER,
       subject: subject.trim(),
       text: body.trim(),
-      html: emailTemplate.wrapInWelcomeTemplate(body.trim())
+      html: emailTemplate.wrapInWelcomeTemplate(body.trim()),
+      headers: {
+        // A real, working opt-out signal — spam filters specifically look
+        // for this on anything that reads as promotional/outreach mail,
+        // and its absence can itself count against deliverability.
+        'List-Unsubscribe': `<mailto:${process.env.SMTP_USER}?subject=Unsubscribe>`
+      }
     });
 
     const existing = db.prepare('SELECT * FROM email_contacts WHERE email = ?').get(cleanEmail);
