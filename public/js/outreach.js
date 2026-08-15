@@ -24,38 +24,45 @@
 
   function renderEditor(lead) {
     editor.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
-        <div>
-          <span class="checkbox-pill" style="cursor:default; font-weight:bold;">${escapeHtml(lead.priority || '—')}</span>
-          <strong style="margin-left:8px;">${escapeHtml(lead.business_name)}</strong>
-          <span style="color:var(--ink-soft); font-size:0.85rem;"> — ${escapeHtml(lead.location)}</span>
-        </div>
-        <span class="checkbox-pill" style="cursor:default;">status: ${escapeHtml(lead.status)}</span>
+      <div class="field-group" style="margin-bottom:10px;">
+        <label>To</label>
+        <input type="text" value="${lead.email ? escapeHtml(lead.email) : 'No direct email — visit their website instead'}" disabled style="background:#f0eee8; color:${lead.email ? 'var(--ink)' : 'var(--ink-soft)'};">
       </div>
-      <p style="font-size:0.85rem; color:var(--ink-soft); margin:8px 0;">
-        ${escapeHtml(lead.business_type)}${lead.contact_name ? ' &middot; Contact: ' + escapeHtml(lead.contact_name) : ''}
-        ${lead.website ? ` &middot; <a href="${escapeHtml(lead.website)}" target="_blank" rel="noopener">Website</a>` : ''}
-      </p>
-      <p style="font-size:0.85rem; color:var(--ink-soft); margin:0 0 8px;">${escapeHtml(lead.why_fit)}</p>
-      ${!lead.email ? `<p style="font-size:0.82rem; background:#f0eee8; padding:8px 10px; border-radius:4px;">No direct email on file. ${escapeHtml(lead.notes)}</p>` : ''}
-      <div class="draft-area" style="margin-top:10px;">
-        <div class="field-group" style="margin-bottom:6px;">
-          <label>Subject</label>
-          <input type="text" id="draftSubjectInput" value="${escapeHtml(lead.draft_subject || '')}" placeholder="Generate a draft, or write your own">
-        </div>
-        <div class="field-group" style="margin-bottom:6px;">
-          <label>Body</label>
-          <textarea id="draftBodyInput" rows="6" placeholder="Generate a draft, or write your own">${escapeHtml(lead.draft_body || '')}</textarea>
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          ${anthropicConfigured ? `<button class="btn btn-secondary btn-sm" id="generateDraftBtn" type="button">✨ Generate draft</button>` : ''}
+      <div class="field-group" style="margin-bottom:10px;">
+        <label>Subject</label>
+        <input type="text" id="draftSubjectInput" value="${escapeHtml(lead.draft_subject || '')}" placeholder="Click Generate below, or write your own">
+      </div>
+
+      <div style="margin:14px 0;">
+        ${anthropicConfigured ? `<button class="btn btn-primary btn-block" id="generateDraftBtn" type="button" style="font-size:0.95rem; padding:12px;">✨ Generate email with AI</button>` : `<p style="font-size:0.85rem; color:var(--ink-soft);">AI drafting isn't connected yet — write the email below by hand.</p>`}
+      </div>
+
+      <div class="field-group" style="margin-bottom:10px;">
+        <label>Message</label>
+        <textarea id="draftBodyInput" rows="7" placeholder="Your generated (or hand-written) email will appear here">${escapeHtml(lead.draft_body || '')}</textarea>
+      </div>
+
+      <div style="margin:14px 0 6px;">
+        ${lead.email ? `<button class="btn btn-primary btn-block" id="sendOutreachBtn" type="button" style="font-size:0.95rem; padding:12px; background:var(--ocean-dark, #536b58);">Send email</button>` : ''}
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+        <span id="draftStatusMsg" style="font-size:0.82rem;"></span>
+        <div style="display:flex; gap:8px;">
           <button class="btn btn-secondary btn-sm" id="saveDraftBtn" type="button">Save draft</button>
-          ${lead.email ? `<button class="btn btn-primary btn-sm" id="sendOutreachBtn" type="button">Send email</button>` : ''}
           ${lead.status === 'sent' ? `<button class="btn btn-secondary btn-sm" id="markRepliedBtn" type="button">Mark as replied</button>` : ''}
           <button class="btn btn-sm" id="deleteLeadBtn" type="button" style="background:var(--danger); color:#fff;">Delete</button>
-          <span id="draftStatusMsg" style="font-size:0.82rem;"></span>
         </div>
       </div>
+
+      <details style="margin-top:16px; font-size:0.82rem; color:var(--ink-soft);">
+        <summary style="cursor:pointer;">About this business</summary>
+        <p style="margin:8px 0 0;">
+          ${escapeHtml(lead.business_type)}${lead.contact_name ? ' &middot; Contact: ' + escapeHtml(lead.contact_name) : ''}
+          ${lead.website ? ` &middot; <a href="${escapeHtml(lead.website)}" target="_blank" rel="noopener">Website</a>` : ''}
+        </p>
+        <p style="margin:6px 0 0;">${escapeHtml(lead.why_fit)}</p>
+      </details>
     `;
 
     wireEditorButtons(lead);

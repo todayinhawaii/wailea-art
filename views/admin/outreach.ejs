@@ -108,21 +108,19 @@
       <div class="outreach-sidebar" id="outreachSidebar">
         <% leads.forEach(function(lead, i) { %>
           <div class="outreach-sidebar-item <%= i === 0 ? 'active' : '' %>" data-id="<%= lead.id %>">
-            <div style="display:flex; justify-content:space-between; gap:6px;">
-              <strong style="font-size:0.88rem;"><%= lead.business_name %></strong>
-              <span style="font-size:0.7rem; color:var(--ink-soft); white-space:nowrap;"><%= lead.priority %></span>
+            <strong style="font-size:0.9rem;"><%= lead.business_name %></strong>
+            <div style="font-size:0.78rem; color:var(--ink-soft); margin-top:2px;">
+              <% if (lead.email) { %><%= lead.email %><% } else { %><em>no direct email</em><% } %>
             </div>
-            <div style="font-size:0.76rem; color:var(--ink-soft);"><%= lead.location %></div>
-            <div style="font-size:0.72rem; margin-top:2px;">
+            <div style="font-size:0.7rem; margin-top:3px;">
               <span class="status-dot status-<%= lead.status %>"></span> <%= lead.status %>
-              <% if (!lead.email) { %> &middot; no email<% } %>
             </div>
           </div>
         <% }); %>
       </div>
 
       <div class="outreach-main">
-        <div class="admin-card" id="outreachEditor">
+        <div class="admin-card" id="outreachEditor" style="margin-bottom:20px;">
           <!-- Filled in by JS on load / lead selection -->
         </div>
 
