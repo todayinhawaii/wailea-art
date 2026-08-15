@@ -43,6 +43,118 @@
     </script>
   <% } %>
 
+  <div class="admin-store-top">
+      <div class="admin-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Blog posts</h3>
+          <a class="btn btn-secondary btn-sm" href="/admin/posts/new">Write new post</a>
+        </div>
+        <p style="color: var(--ink-soft); font-size: 0.85rem;">These show up on your Journal page. Drag to reorder, or use the buttons below.</p>
+
+        <% if (posts.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No posts yet — write your first one.</p>
+        <% } else { %>
+          <ul class="sortable-list" id="postsSortableList">
+            <% posts.forEach(function(p) { %>
+              <li class="sortable-item" draggable="true" data-id="<%= p.id %>">
+                <span class="drag-handle">&#8942;&#8942;</span>
+                <% if (/\.(mp4|webm|mov)$/i.test(p.featured_image)) { %>
+                  <video src="<%= p.featured_image %>" muted></video>
+                <% } else { %>
+                  <img src="<%= p.featured_image %>" alt="<%= p.title %>">
+                <% } %>
+                <div class="item-title"><%= p.title %></div>
+                <div class="item-actions">
+                  <a class="btn btn-secondary btn-sm" href="/admin/posts/<%= p.id %>/edit">Edit</a>
+                  <button class="btn btn-secondary btn-sm move-top-btn" type="button">To top</button>
+                  <button class="btn btn-secondary btn-sm move-bottom-btn" type="button">To bottom</button>
+                  <form method="POST" action="/admin/posts/<%= p.id %>/delete" onsubmit="return confirm('Delete this post? This cannot be undone.');">
+                    <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
+                  </form>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <div style="display:flex; align-items:center; gap:14px; margin-top:14px;">
+            <button class="btn btn-primary" type="button" id="savePostOrderBtn">Save order</button>
+            <span id="postOrderSaveStatus" style="font-size:0.85rem; opacity:0; transition:opacity 0.3s ease;"></span>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="admin-card">
+        <h3>Messages</h3>
+        <% if (messages.length === 0) { %>
+          <p style="color: var(--ink-soft); font-size: 0.9rem;">No messages yet.</p>
+        <% } else { %>
+          <div style="margin-bottom: 10px;">
+            <label class="checkbox-pill" style="width: fit-content;">
+              <input type="checkbox" id="selectAllMessages">
+              <span>Select all</span>
+            </label>
+          </div>
+          <% messages.forEach(function(m) { %>
+            <div class="msg-item" style="display:flex; gap:10px; align-items:flex-start;">
+              <input type="checkbox" class="message-select-checkbox" value="<%= m.id %>" style="width:16px; height:16px; flex-shrink:0; margin-top:4px;">
+              <div style="flex:1;">
+                <% if (m.wants_wholesale) { %>
+                  <div style="background:#fdf6e3; border:1px solid #e8d9a8; border-radius:4px; padding:4px 8px; font-size:0.76rem; font-weight:bold; display:inline-block; margin-bottom:4px;">🏪 Wants to showcase in their shop/gallery</div>
+                <% } %>
+                <div class="msg-meta">
+                  <%= m.name %> &middot; <%= m.email %>
+                  <% if (m.business_name) { %> &middot; <strong><%= m.business_name %></strong><% } %>
+                  &middot; <%= m.created_at %>
+                </div>
+                <% if (m.business_address) { %>
+                  <div style="font-size:0.8rem; color:var(--ink-soft); margin-top:2px;">📍 <%= m.business_address %></div>
+                <% } %>
+                <div class="msg-body"><%= m.message %></div>
+              </div>
+            </div>
+          <% }); %>
+
+          <div style="display:flex; align-items:center; gap:12px; margin-top:16px; flex-wrap: wrap;">
+            <button class="btn btn-sm" type="button" id="deleteSelectedMessagesBtn" style="background:var(--danger); color:#fff; display:none;">Delete selected (<span id="selectedMessagesCount">0</span>)</button>
+            <button class="btn btn-primary btn-sm" type="button" id="emailSelectedMessagesBtn" style="display:none;">Email selected (<span id="selectedMessagesCountForEmail">0</span>)</button>
+            <button class="btn btn-secondary btn-sm" type="button" id="blockSelectedMessagesBtn" style="display:none;">🚫 Block sender (<span id="selectedMessagesCountForBlock">0</span>)</button>
+          </div>
+
+          <div id="messageEmailComposer" class="hidden" style="margin-top:16px; border-top:1px solid var(--sand-line); padding-top:16px;">
+            <div class="field-group">
+              <label for="marketingEmailSubject">Subject</label>
+              <input type="text" id="marketingEmailSubject" placeholder="e.g. New Hawaii art now available">
+            </div>
+            <div class="field-group">
+              <label for="marketingEmailBody">Message</label>
+              <textarea id="marketingEmailBody" rows="5" placeholder="Write your email here..."></textarea>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <button class="btn btn-primary btn-sm" type="button" id="sendMarketingEmailBtn">Send email</button>
+              <button class="btn btn-secondary btn-sm" type="button" id="cancelMarketingEmailBtn">Cancel</button>
+              <span id="marketingEmailStatus" style="font-size:0.85rem;"></span>
+            </div>
+          </div>
+        <% } %>
+      </div>
+      <% if (blockedEmails.length > 0) { %>
+        <div class="admin-card">
+          <h3>Blocked senders</h3>
+          <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">Messages from these addresses are silently ignored — no email lands in your inbox, and nothing shows in your Messages list.</p>
+          <% blockedEmails.forEach(function(b) { %>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid var(--sand-line);">
+              <div>
+                <%= b.email %>
+                <span style="font-size:0.76rem; color:var(--ink-soft);">— blocked <%= b.blocked_at %></span>
+              </div>
+              <form method="POST" action="/admin/blocked-emails/<%= b.id %>/unblock">
+                <button class="btn btn-secondary btn-sm" type="submit">Unblock</button>
+              </form>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+  </div>
+
   <div class="admin-grid">
     <div>
       <div class="admin-card">
@@ -542,117 +654,6 @@
     </div>
   </div>
 
-  <div class="admin-store-top">
-      <div class="admin-card">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">Blog posts</h3>
-          <a class="btn btn-secondary btn-sm" href="/admin/posts/new">Write new post</a>
-        </div>
-        <p style="color: var(--ink-soft); font-size: 0.85rem;">These show up on your Journal page. Drag to reorder, or use the buttons below.</p>
-
-        <% if (posts.length === 0) { %>
-          <p style="color: var(--ink-soft); font-size: 0.9rem;">No posts yet — write your first one.</p>
-        <% } else { %>
-          <ul class="sortable-list" id="postsSortableList">
-            <% posts.forEach(function(p) { %>
-              <li class="sortable-item" draggable="true" data-id="<%= p.id %>">
-                <span class="drag-handle">&#8942;&#8942;</span>
-                <% if (/\.(mp4|webm|mov)$/i.test(p.featured_image)) { %>
-                  <video src="<%= p.featured_image %>" muted></video>
-                <% } else { %>
-                  <img src="<%= p.featured_image %>" alt="<%= p.title %>">
-                <% } %>
-                <div class="item-title"><%= p.title %></div>
-                <div class="item-actions">
-                  <a class="btn btn-secondary btn-sm" href="/admin/posts/<%= p.id %>/edit">Edit</a>
-                  <button class="btn btn-secondary btn-sm move-top-btn" type="button">To top</button>
-                  <button class="btn btn-secondary btn-sm move-bottom-btn" type="button">To bottom</button>
-                  <form method="POST" action="/admin/posts/<%= p.id %>/delete" onsubmit="return confirm('Delete this post? This cannot be undone.');">
-                    <button class="btn btn-sm" style="background:var(--danger); color:#fff;" type="submit">Delete</button>
-                  </form>
-                </div>
-              </li>
-            <% }); %>
-          </ul>
-          <div style="display:flex; align-items:center; gap:14px; margin-top:14px;">
-            <button class="btn btn-primary" type="button" id="savePostOrderBtn">Save order</button>
-            <span id="postOrderSaveStatus" style="font-size:0.85rem; opacity:0; transition:opacity 0.3s ease;"></span>
-          </div>
-        <% } %>
-      </div>
-
-      <div class="admin-card">
-        <h3>Messages</h3>
-        <% if (messages.length === 0) { %>
-          <p style="color: var(--ink-soft); font-size: 0.9rem;">No messages yet.</p>
-        <% } else { %>
-          <div style="margin-bottom: 10px;">
-            <label class="checkbox-pill" style="width: fit-content;">
-              <input type="checkbox" id="selectAllMessages">
-              <span>Select all</span>
-            </label>
-          </div>
-          <% messages.forEach(function(m) { %>
-            <div class="msg-item" style="display:flex; gap:10px; align-items:flex-start;">
-              <input type="checkbox" class="message-select-checkbox" value="<%= m.id %>" style="width:16px; height:16px; flex-shrink:0; margin-top:4px;">
-              <div style="flex:1;">
-                <% if (m.wants_wholesale) { %>
-                  <div style="background:#fdf6e3; border:1px solid #e8d9a8; border-radius:4px; padding:4px 8px; font-size:0.76rem; font-weight:bold; display:inline-block; margin-bottom:4px;">🏪 Wants to showcase in their shop/gallery</div>
-                <% } %>
-                <div class="msg-meta">
-                  <%= m.name %> &middot; <%= m.email %>
-                  <% if (m.business_name) { %> &middot; <strong><%= m.business_name %></strong><% } %>
-                  &middot; <%= m.created_at %>
-                </div>
-                <% if (m.business_address) { %>
-                  <div style="font-size:0.8rem; color:var(--ink-soft); margin-top:2px;">📍 <%= m.business_address %></div>
-                <% } %>
-                <div class="msg-body"><%= m.message %></div>
-              </div>
-            </div>
-          <% }); %>
-
-          <div style="display:flex; align-items:center; gap:12px; margin-top:16px; flex-wrap: wrap;">
-            <button class="btn btn-sm" type="button" id="deleteSelectedMessagesBtn" style="background:var(--danger); color:#fff; display:none;">Delete selected (<span id="selectedMessagesCount">0</span>)</button>
-            <button class="btn btn-primary btn-sm" type="button" id="emailSelectedMessagesBtn" style="display:none;">Email selected (<span id="selectedMessagesCountForEmail">0</span>)</button>
-            <button class="btn btn-secondary btn-sm" type="button" id="blockSelectedMessagesBtn" style="display:none;">🚫 Block sender (<span id="selectedMessagesCountForBlock">0</span>)</button>
-          </div>
-
-          <div id="messageEmailComposer" class="hidden" style="margin-top:16px; border-top:1px solid var(--sand-line); padding-top:16px;">
-            <div class="field-group">
-              <label for="marketingEmailSubject">Subject</label>
-              <input type="text" id="marketingEmailSubject" placeholder="e.g. New Hawaii art now available">
-            </div>
-            <div class="field-group">
-              <label for="marketingEmailBody">Message</label>
-              <textarea id="marketingEmailBody" rows="5" placeholder="Write your email here..."></textarea>
-            </div>
-            <div style="display:flex; align-items:center; gap:12px;">
-              <button class="btn btn-primary btn-sm" type="button" id="sendMarketingEmailBtn">Send email</button>
-              <button class="btn btn-secondary btn-sm" type="button" id="cancelMarketingEmailBtn">Cancel</button>
-              <span id="marketingEmailStatus" style="font-size:0.85rem;"></span>
-            </div>
-          </div>
-        <% } %>
-      </div>
-      <% if (blockedEmails.length > 0) { %>
-        <div class="admin-card">
-          <h3>Blocked senders</h3>
-          <p style="color: var(--ink-soft); font-size: 0.85rem; margin-top:-6px;">Messages from these addresses are silently ignored — no email lands in your inbox, and nothing shows in your Messages list.</p>
-          <% blockedEmails.forEach(function(b) { %>
-            <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid var(--sand-line);">
-              <div>
-                <%= b.email %>
-                <span style="font-size:0.76rem; color:var(--ink-soft);">— blocked <%= b.blocked_at %></span>
-              </div>
-              <form method="POST" action="/admin/blocked-emails/<%= b.id %>/unblock">
-                <button class="btn btn-secondary btn-sm" type="submit">Unblock</button>
-              </form>
-            </div>
-          <% }); %>
-        </div>
-      <% } %>
-  </div>
 </main>
 
 <%- include('../partials/site-footer') %>
