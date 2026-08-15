@@ -769,6 +769,7 @@ router.post('/artworks/:id/move', requireAdmin, (req, res) => {
 const printify = require('../lib/printify');
 const anthropic = require('../lib/anthropic');
 const emailTemplate = require('../lib/emailTemplate');
+const imapClient = require('../lib/imapClient');
 const { parse: parseCsv } = require('csv-parse/sync');
 
 // ---------- Store (Printify-ready product categories) ----------
@@ -1339,11 +1340,44 @@ router.get('/outreach', requireAdmin, (req, res) => {
     ORDER BY (last_sent_at IS NULL) ASC, last_sent_at DESC, created_at DESC
   `).all();
 
+  const repliesStmt = db.prepare('SELECT * FROM email_replies WHERE contact_id = ? ORDER BY received_at DESC, id DESC');
+  contacts.forEach(c => { c.replies = repliesStmt.all(c.id); });
+
   res.render('admin/outreach', {
     contacts,
     anthropicConfigured: anthropic.isConfigured(),
+    imapConfigured: imapClient.isConfigured(),
     page: 'admin'
   });
+});
+
+router.post('/outreach/check-replies', requireAdmin, async (req, res) => {
+  const contacts = db.prepare('SELECT id, email FROM email_contacts').all();
+  if (contacts.length === 0) return res.json({ ok: true, newReplies: 0 });
+
+  try {
+    const messages = await imapClient.checkForReplies(contacts.map(c => c.email));
+    const emailToContactId = {};
+    contacts.forEach(c => { emailToContactId[c.email] = c.id; });
+
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO email_replies (contact_id, message_id, from_email, subject, body, received_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    let newCount = 0;
+    messages.forEach(m => {
+      const contactId = emailToContactId[m.fromEmail];
+      if (!contactId) return;
+      const result = insert.run(contactId, m.messageId, m.fromEmail, m.subject, m.body, m.receivedAt);
+      if (result.changes > 0) newCount++;
+    });
+
+    res.json({ ok: true, newReplies: newCount });
+  } catch (err) {
+    console.error('Check replies error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post('/outreach/generate-draft', requireAdmin, async (req, res) => {
@@ -1365,7 +1399,7 @@ router.post('/outreach/render-preview', requireAdmin, (req, res) => {
 });
 
 router.post('/outreach/send', requireAdmin, async (req, res) => {
-  const { email, label, subject, body } = req.body;
+  const { email, label, subject, body, inReplyTo } = req.body;
 
   if (!isRealEmail(email)) return res.status(400).json({ error: 'Enter a valid email address first.' });
   if (!subject || !subject.trim() || !body || !body.trim()) return res.status(400).json({ error: 'Write or generate a message before sending.' });
@@ -1374,7 +1408,7 @@ router.post('/outreach/send', requireAdmin, async (req, res) => {
   const cleanEmail = email.trim().toLowerCase();
 
   try {
-    await mailTransporter.sendMail({
+    const mailOptions = {
       from: `"Wailea Art" <${process.env.SMTP_USER}>`,
       to: cleanEmail,
       replyTo: process.env.CONTACT_EMAIL || process.env.SMTP_USER,
@@ -1387,7 +1421,20 @@ router.post('/outreach/send', requireAdmin, async (req, res) => {
         // and its absence can itself count against deliverability.
         'List-Unsubscribe': `<mailto:${process.env.SMTP_USER}?subject=Unsubscribe>`
       }
-    });
+    };
+
+    // If this is a reply to a specific message, set proper threading
+    // headers so it shows up as part of the same conversation in the
+    // recipient's inbox instead of a disconnected new email.
+    if (inReplyTo) {
+      mailOptions.inReplyTo = inReplyTo;
+      mailOptions.references = inReplyTo;
+      if (!/^re:/i.test(mailOptions.subject)) {
+        mailOptions.subject = `Re: ${mailOptions.subject}`;
+      }
+    }
+
+    await mailTransporter.sendMail(mailOptions);
 
     const existing = db.prepare('SELECT * FROM email_contacts WHERE email = ?').get(cleanEmail);
     let timesSent;

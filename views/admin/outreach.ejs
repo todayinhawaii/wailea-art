@@ -5,12 +5,23 @@
 <main class="wrap admin-shell">
   <div class="admin-header">
     <h1 style="margin:0;">Wholesale Outreach</h1>
-    <a class="btn btn-secondary btn-sm" href="/admin">Back to admin</a>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <% if (imapConfigured) { %>
+        <button class="btn btn-secondary btn-sm" id="checkRepliesBtn" type="button">📥 Check for replies</button>
+      <% } %>
+      <a class="btn btn-secondary btn-sm" href="/admin">Back to admin</a>
+    </div>
   </div>
+  <p id="checkRepliesStatus" style="font-size:0.85rem; margin-top:-10px;"></p>
 
   <% if (!anthropicConfigured) { %>
     <div class="alert" style="background:#fdf6e3; border:1px solid #e8d9a8; padding:12px 16px; border-radius:var(--radius); margin-bottom:20px;">
       AI drafting isn't connected yet — add <code>ANTHROPIC_API_KEY</code> as an environment variable in Render to enable "Generate with AI."
+    </div>
+  <% } %>
+  <% if (!imapConfigured) { %>
+    <div class="alert" style="background:#fdf6e3; border:1px solid #e8d9a8; padding:12px 16px; border-radius:var(--radius); margin-bottom:20px;">
+      Reading replies isn't connected yet — it uses the same <code>SMTP_USER</code> / <code>SMTP_PASSWORD</code> you already have in Render, so this should just work once those are set.
     </div>
   <% } %>
 
@@ -24,7 +35,10 @@
         <div class="outreach-sidebar-item" data-id="<%= c.id %>">
           <strong style="font-size:0.9rem;"><%= c.email %></strong>
           <% if (c.label) { %><div style="font-size:0.78rem; color:var(--ink-soft); margin-top:2px;"><%= c.label %></div><% } %>
-          <div style="font-size:0.72rem; margin-top:3px; color:var(--ocean);">Sent <%= c.times_sent %>x<% if (c.last_sent_at) { %> &middot; last <%= c.last_sent_at.split(' ')[0] %><% } %></div>
+          <div style="font-size:0.72rem; margin-top:3px; color:var(--ocean);">
+            Sent <%= c.times_sent %>x<% if (c.last_sent_at) { %> &middot; last <%= c.last_sent_at.split(' ')[0] %><% } %>
+            <% if (c.replies && c.replies.length > 0) { %> &middot; <strong style="color:#b5451b;"><%= c.replies.length %> repl<%= c.replies.length === 1 ? 'y' : 'ies' %></strong><% } %>
+          </div>
         </div>
       <% }); %>
       <% if (contacts.length === 0) { %>
