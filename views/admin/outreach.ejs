@@ -8,6 +8,7 @@
   <div class="admin-header">
     <h1 style="margin:0;">Wholesale Outreach</h1>
     <div style="display:flex; gap:10px; align-items:center;">
+      <a class="btn btn-secondary btn-sm" href="/admin/outreach/template">✏️ Edit email template</a>
       <% if (imapConfigured) { %>
         <button class="btn btn-secondary btn-sm" id="checkRepliesBtn" type="button">📥 Check for replies</button>
       <% } %>
@@ -64,6 +65,7 @@
 </main>
 
 <script type="application/json" id="contactsData"><%- JSON.stringify(contacts) %></script>
+<script type="application/json" id="defaultTemplateData"><%- JSON.stringify(defaultTemplate) %></script>
 <script>window.ANTHROPIC_CONFIGURED = <%= anthropicConfigured ? 'true' : 'false' %>;</script>
 
 <%- include('../partials/site-footer') %>

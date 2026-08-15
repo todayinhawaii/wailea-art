@@ -5,6 +5,7 @@
   if (!sidebar || !editor || !previewFrame) return;
 
   const contactsData = JSON.parse(document.getElementById('contactsData').textContent);
+  const defaultTemplate = JSON.parse(document.getElementById('defaultTemplateData').textContent);
   const contactsById = {};
   contactsData.forEach(c => { contactsById[c.id] = c; });
 
@@ -61,8 +62,8 @@
     const isNew = !contact;
     const email = isNew ? '' : contact.email;
     const label = isNew ? '' : contact.label;
-    const subject = isNew ? '' : (contact.last_subject || '');
-    const bodyHtml = isNew ? '' : toEditorHtml(contact.last_body || '');
+    const subject = isNew ? (defaultTemplate.subject || '') : (contact.last_subject || '');
+    const bodyHtml = isNew ? toEditorHtml(defaultTemplate.body || '') : toEditorHtml(contact.last_body || '');
     const replies = (!isNew && contact.replies) ? contact.replies : [];
 
     const repliesHtml = replies.length > 0 ? `

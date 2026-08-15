@@ -1334,6 +1334,36 @@ function isRealEmail(value) {
   return !!value && /\S+@\S+\.\S+/.test(value);
 }
 
+function getDefaultTemplate() {
+  const subjectRow = db.prepare("SELECT value FROM settings WHERE key = 'outreach_default_subject'").get();
+  const bodyRow = db.prepare("SELECT value FROM settings WHERE key = 'outreach_default_body'").get();
+  return {
+    subject: subjectRow ? subjectRow.value : '',
+    body: bodyRow ? bodyRow.value : ''
+  };
+}
+
+router.get('/outreach/template', requireAdmin, (req, res) => {
+  res.render('admin/outreach-template', {
+    template: getDefaultTemplate(),
+    saved: req.query.saved,
+    page: 'admin'
+  });
+});
+
+router.post('/outreach/template', requireAdmin, (req, res) => {
+  const { subject, body } = req.body;
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES ('outreach_default_subject', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run((subject || '').trim());
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES ('outreach_default_body', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(body || '');
+  res.redirect('/admin/outreach/template?saved=1');
+});
+
 router.get('/outreach', requireAdmin, (req, res) => {
   const contacts = db.prepare(`
     SELECT * FROM email_contacts
@@ -1345,6 +1375,7 @@ router.get('/outreach', requireAdmin, (req, res) => {
 
   res.render('admin/outreach', {
     contacts,
+    defaultTemplate: getDefaultTemplate(),
     anthropicConfigured: anthropic.isConfigured(),
     imapConfigured: imapClient.isConfigured(),
     page: 'admin'
