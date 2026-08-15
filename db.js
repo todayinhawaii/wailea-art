@@ -112,6 +112,26 @@ db.exec(`
     blocked_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS outreach_leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    priority TEXT NOT NULL DEFAULT '',
+    business_name TEXT NOT NULL,
+    location TEXT NOT NULL DEFAULT '',
+    region TEXT NOT NULL DEFAULT '',
+    email TEXT,
+    website TEXT NOT NULL DEFAULT '',
+    contact_name TEXT NOT NULL DEFAULT '',
+    business_type TEXT NOT NULL DEFAULT '',
+    why_fit TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'new',
+    draft_subject TEXT,
+    draft_body TEXT,
+    sent_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
