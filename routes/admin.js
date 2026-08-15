@@ -1369,6 +1369,12 @@ router.post('/outreach/import', requireAdmin, uploadCsv.single('csv'), (req, res
       const businessName = (row.Business || row.business_name || '').trim();
       if (!businessName) { skippedNoBusinessName++; continue; }
 
+      // A CSV can carry its own per-row region (useful for a combined,
+      // multi-island file) — falls back to the typed label above when the
+      // column isn't present, so every existing single-region file still
+      // works exactly as before.
+      const rowRegion = (row.Region || row.region || '').trim() || region;
+
       const rawEmail = (row.Email || row.email || '').trim();
       const hasRealEmail = isRealEmail(rawEmail);
       const email = hasRealEmail ? rawEmail.toLowerCase() : null;
@@ -1380,7 +1386,7 @@ router.post('/outreach/import', requireAdmin, uploadCsv.single('csv'), (req, res
         // No direct email to key on — fall back to business name + region
         // so re-importing the same list doesn't create duplicate rows for
         // every "use website contact form" style lead.
-        const noEmailKey = `${businessName.toLowerCase()}::${region.toLowerCase()}`;
+        const noEmailKey = `${businessName.toLowerCase()}::${rowRegion.toLowerCase()}`;
         if (existingNoEmailKeys.has(noEmailKey)) { skippedDuplicate++; continue; }
         existingNoEmailKeys.add(noEmailKey);
       }
@@ -1392,7 +1398,7 @@ router.post('/outreach/import', requireAdmin, uploadCsv.single('csv'), (req, res
         (row.Priority || row.priority || '').trim(),
         businessName,
         (row.Location || row.location || '').trim(),
-        region,
+        rowRegion,
         email,
         (row.Website || row.website || '').trim(),
         (row.Contact || row.contact_name || '').trim(),
